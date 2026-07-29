@@ -1,0 +1,1178 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>薪火 · 师傅带徒 AI 导师系统</title>
+<style>
+/* ===== Design System: 中科创达 ThunderSoft 品牌 · 红白主色 ===== */
+:root {
+  /* 品牌红：创达红 #C41230 */
+  --brand-red: #C41230;
+  --brand-red-dark: #9E0E26;
+  --brand-red-light: #FFF0F3;
+  --brand-red-bg: #FFFAFA;
+
+  /* 背景 */
+  --bg: #FAFAFA;
+  --surface: #FFFFFF;
+  --surface2: #F5F5F7;
+
+  /* 文字 */
+  --text: #1D1D1F;
+  --text2: #6E6E73;
+  --text3: #AEAEB2;
+
+  /* 边框 */
+  --border: #E5E5EA;
+
+  /* 语义色 */
+  --primary: #C41230;
+  --primary-hover: #9E0E26;
+  --primary-light: #FFF0F3;
+  --success: #34C759;
+  --success-light: #EDFDF1;
+  --warning: #FF9500;
+  --warning-light: #FFF8F0;
+  --danger: #FF3B30;
+  --danger-light: #FFF5F5;
+  --info: #5856D6;
+
+  /* 形状 */
+  --radius: 12px;
+  --radius-sm: 8px;
+  --radius-lg: 16px;
+
+  /* 阴影 */
+  --shadow: 0 1px 2px rgba(0,0,0,.04);
+  --shadow-md: 0 4px 16px rgba(0,0,0,.06);
+  --shadow-lg: 0 12px 40px rgba(0,0,0,.08);
+
+  /* 动效 */
+  --transition: 200ms cubic-bezier(0.25, 0.1, 0.25, 1);
+  --transition-slow: 350ms cubic-bezier(0.25, 0.1, 0.25, 1);
+
+  /* 字体 */
+  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Display", "PingFang SC", "Microsoft YaHei", "Helvetica Neue", sans-serif;
+  --font-mono: "SF Mono", "Fira Code", "Cascadia Code", "Consolas", monospace;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: var(--font-sans);
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.6;
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Layout */
+.app { display: flex; flex-direction: column; min-height: 100vh; }
+.topbar {
+  height: 56px;
+  background: var(--brand-red);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 24px;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  box-shadow: 0 2px 8px rgba(196,18,48,.15);
+}
+.topbar .logo {
+  font-size: 17px;
+  font-weight: 700;
+  color: #fff;
+  letter-spacing: 0.5px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.topbar .logo .brand-icon {
+  width: 28px; height: 28px;
+  background: #fff;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 900;
+  color: var(--brand-red);
+}
+.topbar .user-area { display: flex; align-items: center; gap: 12px; font-size: 13px; color: rgba(255,255,255,.9); }
+.topbar .user-area .badge {
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 600;
+  background: rgba(255,255,255,.18);
+  color: #fff;
+  border: 1px solid rgba(255,255,255,.25);
+}
+.topbar .user-area button {
+  padding: 5px 12px;
+  border: 1px solid rgba(255,255,255,.3);
+  background: transparent;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: 12px;
+  color: rgba(255,255,255,.85);
+  transition: var(--transition);
+}
+.topbar .user-area button:hover { background: rgba(255,255,255,.12); border-color: rgba(255,255,255,.5); }
+
+.main { flex: 1; max-width: 1200px; width: 100%; margin: 0 auto; padding: 24px; }
+
+/* Auth Screen */
+.auth-screen {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  background: linear-gradient(160deg, var(--brand-red-bg) 0%, #FFF 40%, #FFF 60%, var(--brand-red-bg) 100%);
+}
+.auth-card {
+  background: var(--surface);
+  border-radius: var(--radius-lg);
+  padding: 44px 40px;
+  width: 420px;
+  max-width: 92vw;
+  box-shadow: var(--shadow-lg);
+  text-align: center;
+  border: 1px solid var(--border);
+}
+.auth-card .brand-mark {
+  width: 52px; height: 52px;
+  background: var(--brand-red);
+  border-radius: 14px;
+  margin: 0 auto 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 22px;
+  font-weight: 900;
+  box-shadow: 0 4px 12px rgba(196,18,48,.3);
+}
+.auth-card h1 { font-size: 22px; margin-bottom: 2px; letter-spacing: -0.2px; font-weight: 700; }
+.auth-card .sub { font-size: 13px; color: var(--text3); margin-bottom: 28px; }
+.auth-card .tabs { display: flex; border-bottom: 2px solid var(--border); margin-bottom: 24px; }
+.auth-card .tab {
+  flex: 1;
+  padding: 10px;
+  text-align: center;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text3);
+  border-bottom: 2px solid transparent;
+  margin-bottom: -2px;
+  transition: var(--transition);
+}
+.auth-card .tab.active { color: var(--brand-red); border-bottom-color: var(--brand-red); }
+.form-group { margin-bottom: 16px; text-align: left; }
+.form-group label { display: block; font-size: 13px; font-weight: 600; color: var(--text2); margin-bottom: 4px; }
+.form-group input, .form-group select {
+  width: 100%;
+  padding: 10px 14px;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+  transition: var(--transition);
+  outline: none;
+  background: var(--surface);
+}
+.form-group input:focus, .form-group select:focus { border-color: var(--brand-red); box-shadow: 0 0 0 3px rgba(196,18,48,.1); }
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 10px 20px;
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+  transition: var(--transition);
+  white-space: nowrap;
+}
+.btn-primary { background: var(--brand-red); color: #fff; box-shadow: 0 2px 6px rgba(196,18,48,.2); }
+.btn-primary:hover { background: var(--brand-red-dark); box-shadow: 0 4px 12px rgba(196,18,48,.3); transform: translateY(-1px); }
+.btn-success { background: var(--success); color: #fff; }
+.btn-success:hover { background: #2DB14F; }
+.btn-outline { background: var(--surface); border: 1.5px solid var(--border); color: var(--text2); }
+.btn-outline:hover { border-color: var(--brand-red); color: var(--brand-red); background: var(--brand-red-light); }
+.btn-danger { background: var(--danger); color: #fff; }
+.btn-danger:hover { background: #E0352B; }
+.btn-sm { padding: 5px 12px; font-size: 12px; border-radius: 6px; }
+.btn:disabled { opacity: .5; cursor: not-allowed; }
+.btn-block { width: 100%; }
+
+/* Cards & Sections */
+.section { margin-bottom: 24px; }
+.section-title { font-size: 18px; font-weight: 700; margin-bottom: 14px; display: flex; align-items: center; gap: 8px; color: var(--text); }
+.card {
+  background: var(--surface);
+  border-radius: var(--radius);
+  padding: 20px;
+  box-shadow: var(--shadow);
+  border: 1px solid var(--border);
+  margin-bottom: 16px;
+  transition: var(--transition);
+}
+.card:hover { box-shadow: var(--shadow-md); }
+.card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.card-title { font-size: 16px; font-weight: 700; }
+
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+.grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+
+/* Stats */
+.stat-box {
+  background: var(--surface);
+  border-radius: var(--radius);
+  padding: 18px;
+  box-shadow: var(--shadow);
+  border: 1px solid var(--border);
+  text-align: center;
+}
+.stat-box .stat-value { font-size: 28px; font-weight: 800; letter-spacing: -0.5px; color: var(--text); }
+.stat-box .stat-label { font-size: 13px; color: var(--text3); margin-top: 4px; }
+.stat-box.red-accent { border-top: 3px solid var(--brand-red); }
+.stat-box.green-accent { border-top: 3px solid var(--success); }
+.stat-box.amber-accent { border-top: 3px solid var(--warning); }
+.stat-box.purple-accent { border-top: 3px solid var(--info); }
+
+/* Tables */
+.table-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th { text-align: left; padding: 10px 12px; font-weight: 600; color: var(--text3); font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 2px solid var(--border); }
+td { padding: 10px 12px; border-bottom: 1px solid var(--border); color: var(--text2); }
+tr:hover td { background: var(--surface2); }
+
+/* Tags & Badges */
+.tag {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+}
+.tag-red { background: var(--brand-red-light); color: var(--brand-red); }
+.tag-green { background: var(--success-light); color: #1B7F3B; }
+.tag-amber { background: var(--warning-light); color: #B86E00; }
+.tag-danger { background: var(--danger-light); color: #C41E1E; }
+.tag-gray { background: var(--surface2); color: var(--text3); }
+.tag-blue { background: var(--brand-red-light); color: var(--brand-red); }
+
+/* Messages */
+.msg { padding: 10px 16px; border-radius: var(--radius-sm); font-size: 13px; margin-bottom: 14px; }
+.msg-info { background: var(--brand-red-light); color: var(--brand-red-dark); border: 1px solid #FFD0D8; }
+.msg-success { background: var(--success-light); color: #1B7F3B; border: 1px solid #A3E8B5; }
+.msg-error { background: var(--danger-light); color: #991B1B; border: 1px solid #FECACA; }
+
+/* Loading */
+.spinner {
+  display: inline-block;
+  width: 18px;
+  height: 18px;
+  border: 2px solid var(--border);
+  border-top-color: var(--brand-red);
+  border-radius: 50%;
+  animation: spin .6s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Modal */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.3);
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(2px);
+}
+.modal {
+  background: var(--surface);
+  border-radius: var(--radius-lg);
+  padding: 28px;
+  width: 520px;
+  max-width: 92vw;
+  max-height: 80vh;
+  overflow-y: auto;
+  box-shadow: var(--shadow-lg);
+}
+.modal h3 { font-size: 18px; margin-bottom: 16px; }
+
+/* Question item */
+.quest-item {
+  padding: 14px;
+  margin-bottom: 12px;
+  background: var(--surface2);
+  border-radius: var(--radius);
+}
+.quest-item .q-header { display: flex; gap: 8px; align-items: center; margin-bottom: 6px; }
+.quest-item .q-text { font-size: 14px; font-weight: 600; }
+.quest-item .q-options { margin: 8px 0; }
+.quest-item .q-options label { display: block; padding: 6px 10px; cursor: pointer; font-size: 13px; }
+.quest-item textarea {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  resize: vertical;
+  min-height: 60px;
+}
+.quest-item .feedback { margin-top: 8px; padding: 8px 12px; border-radius: var(--radius-sm); font-size: 13px; }
+.quest-item .fb-correct { background: var(--success-light); color: #1B7F3B; }
+.quest-item .fb-wrong { background: var(--danger-light); color: #991B1B; }
+
+/* Calendar */
+.calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+.calendar-day {
+  background: var(--surface2);
+  border-radius: var(--radius-sm);
+  padding: 8px;
+  min-height: 80px;
+  cursor: pointer;
+  border: 1.5px solid transparent;
+  transition: var(--transition);
+  font-size: 12px;
+}
+.calendar-day:hover { border-color: var(--brand-red); background: var(--brand-red-light); }
+.calendar-day.today { border-color: var(--brand-red); font-weight: 700; }
+.calendar-day .day-num { font-weight: 700; font-size: 14px; }
+.calendar-day .day-task { font-size: 11px; color: var(--text2); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* Leaderboard */
+.leaderboard-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  margin-bottom: 6px;
+  background: var(--surface2);
+  transition: var(--transition);
+}
+.leaderboard-item:hover { background: var(--brand-red-light); }
+.leaderboard-rank {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 13px;
+}
+.rank-1 { background: #F5A623; color: #fff; }
+.rank-2 { background: #9CA3AF; color: #fff; }
+.rank-3 { background: #D97706; color: #fff; }
+.rank-other { background: var(--border); color: var(--text3); }
+
+/* Knowledge Tree */
+.ktree-dim {
+  background: var(--surface2);
+  border-radius: var(--radius);
+  padding: 14px;
+  margin-bottom: 10px;
+  border-left: 4px solid var(--brand-red);
+}
+.ktree-dim .dim-name { font-weight: 700; font-size: 15px; margin-bottom: 6px; }
+.ktree-dim .dim-desc { font-size: 13px; color: var(--text3); margin-bottom: 8px; }
+.ktree-point { display: inline-block; background: var(--surface); padding: 3px 10px; border-radius: 14px; font-size: 12px; margin: 2px 4px 2px 0; border: 1px solid var(--border); }
+
+/* Mastery bars */
+.mastery-bar { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
+.mastery-bar .bar-label { width: 80px; font-size: 13px; text-align: right; flex-shrink: 0; color: var(--text2); }
+.mastery-bar .bar-track { flex: 1; height: 8px; background: var(--surface2); border-radius: 4px; overflow: hidden; }
+.mastery-bar .bar-fill { height: 100%; border-radius: 4px; transition: width .4s ease; }
+.bar-l3 { background: var(--success); }
+.bar-l2 { background: var(--warning); }
+.bar-l1 { background: var(--brand-red); }
+
+/* Tabs */
+.view-tabs { display: flex; gap: 2px; margin-bottom: 20px; background: var(--surface2); border-radius: var(--radius); padding: 3px; }
+.view-tab {
+  flex: 1;
+  text-align: center;
+  padding: 8px 14px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text3);
+  transition: var(--transition);
+  white-space: nowrap;
+}
+.view-tab.active { background: var(--surface); color: var(--brand-red); box-shadow: var(--shadow); }
+.view-tab:hover:not(.active) { color: var(--text2); }
+
+/* Input */
+input[type="text"], input[type="password"], textarea, select {
+  font-family: var(--font-sans);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; }
+  .main { padding: 14px; }
+  .calendar-grid { grid-template-columns: repeat(4, 1fr); }
+  .view-tabs { flex-wrap: wrap; }
+}
+
+.hidden { display: none !important; }
+</style>
+</head>
+<body>
+
+<div id="app"></div>
+
+<script>
+// ===== State =====
+const S = {
+  token: localStorage.getItem('token') || '',
+  user: null,
+  view: 'login',
+  activeTab: 'overview',
+  data: {}
+};
+
+// ===== API =====
+async function api(method, url, body) {
+  const opts = { method, headers: { 'Content-Type': 'application/json' } };
+  if (S.token) opts.headers['Authorization'] = 'Bearer ' + S.token;
+  if (body) opts.body = JSON.stringify(body);
+  const res = await fetch(url, opts);
+  if (res.status === 401) { S.token = ''; localStorage.removeItem('token'); S.user = null; S.view = 'login'; render(); throw new Error('Unauthorized'); }
+  const ct = res.headers.get('content-type') || '';
+  if (ct.includes('application/json')) return res.json();
+  if (ct.includes('application/pdf')) {
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'lecture.pdf'; a.click();
+    URL.revokeObjectURL(url);
+    return { success: true };
+  }
+  return { success: false, message: '\u672a\u77e5\u54cd\u5e94' };
+}
+const apiGet = url => api('GET', url);
+const apiPost = (url, body) => api('POST', url, body);
+const apiPut = (url, body) => api('PUT', url, body);
+
+// ===== HTML Helpers =====
+function h(tag, attrs, ...children) {
+  const el = document.createElement(tag);
+  if (attrs) {
+    for (const [k, v] of Object.entries(attrs)) {
+      if (k === 'className') el.className = v;
+      else if (k.startsWith('on')) el.addEventListener(k.slice(2).toLowerCase(), v);
+      else if (k === 'html') el.innerHTML = v;
+      else el.setAttribute(k, v);
+    }
+  }
+  for (const c of children) {
+    if (typeof c === 'string') el.appendChild(document.createTextNode(c));
+    else if (c instanceof Node) el.appendChild(c);
+    else if (Array.isArray(c)) c.forEach(cc => el.appendChild(typeof cc === 'string' ? document.createTextNode(cc) : cc));
+  }
+  return el;
+}
+const $ = (sel) => document.querySelector(sel);
+
+// ===== Router =====
+function render() {
+  const app = $('#app');
+  if (!app) return;
+  app.innerHTML = '';
+  if (!S.token || !S.user) { renderAuth(app); return; }
+  renderTopbar(app);
+  const main = h('div', { className: 'main' });
+  app.appendChild(main);
+  if (S.user.role === 'master') renderMaster(main);
+  else renderApprentice(main);
+}
+
+function setView(tab) { S.activeTab = tab; render(); }
+
+// ===== Auth =====
+function renderAuth(app) {
+  app.className = 'auth-screen';
+  let authMode = 'login', role = 'master';
+  const card = h('div', { className: 'auth-card' });
+
+  const updateForm = () => {
+    card.innerHTML = '';
+    // Brand mark
+    const mark = h('div', { className: 'brand-mark' }, '\u5275');
+    card.appendChild(mark);
+    card.appendChild(h('h1', {}, '\u85aa\u706b \u00b7 AI \u5bfc\u5e08\u7cfb\u7edf'));
+    card.appendChild(h('div', { className: 'sub' }, '\u5e08\u5085\u5e26\u5f92 \u00b7 \u77e5\u8bc6\u4f20\u627f \u00b7 \u667a\u80fd\u966a\u7ec3'));
+
+    const tabs = h('div', { className: 'tabs' });
+    ['login', 'register'].forEach(m => {
+      const t = h('div', { className: 'tab' + (authMode === m ? ' active' : ''),
+        onClick: () => { authMode = m; updateForm(); } }, m === 'login' ? '\u767b\u5f55' : '\u6ce8\u518c');
+      tabs.appendChild(t);
+    });
+    card.appendChild(tabs);
+
+    if (authMode === 'register') {
+      const fg = h('div', { className: 'form-group' });
+      fg.appendChild(h('label', {}, '\u89d2\u8272'));
+      const sel = h('select', { value: role, onChange: e => role = e.target.value });
+      sel.appendChild(h('option', { value: 'master' }, '\u5e08\u5085'));
+      fg.appendChild(sel);
+      card.appendChild(fg);
+    }
+
+    ['\u7528\u6237\u540d', '\u5bc6\u7801'].forEach((lbl, i) => {
+      const fg = h('div', { className: 'form-group' });
+      fg.appendChild(h('label', {}, lbl));
+      fg.appendChild(h('input', { type: i === 1 ? 'password' : 'text', placeholder: `\u8bf7\u8f93\u5165${lbl}`, id: `auth-${i}` }));
+      card.appendChild(fg);
+    });
+
+    card.appendChild(h('button', { className: 'btn btn-primary btn-block', onClick: handleAuth }, authMode === 'login' ? '\u767b\u5f55' : '\u6ce8\u518c'));
+    card.appendChild(h('div', { style: 'margin-top:16px;font-size:12px;color:var(--text3);' }, '\u6f14\u793a\u8d26\u53f7: demo_master / 123456'));
+  };
+
+  async function handleAuth() {
+    const username = $('#auth-0').value;
+    const password = $('#auth-1').value;
+    if (!username || !password) return alert('\u8bf7\u586b\u5199\u5b8c\u6574');
+    let res;
+    if (authMode === 'login') {
+      res = await apiPost('/api/login', { username, password });
+    } else {
+      res = await apiPost('/api/register', { username, password, role });
+    }
+    if (res.success) {
+      S.token = res.token;
+      S.user = res.user;
+      localStorage.setItem('token', res.token);
+      render();
+    } else {
+      alert(res.message || '\u64cd\u4f5c\u5931\u8d25');
+    }
+  }
+
+  updateForm();
+  app.appendChild(card);
+}
+
+// ===== Topbar =====
+function renderTopbar(app) {
+  const bar = h('div', { className: 'topbar' });
+  const logo = h('div', { className: 'logo' });
+  const icon = h('span', { className: 'brand-icon' }, '\u5275');
+  logo.appendChild(icon);
+  logo.appendChild(document.createTextNode('\u85aa\u706b \u00b7 AI \u5bfc\u5e08\u7cfb\u7edf'));
+  bar.appendChild(logo);
+
+  const ua = h('div', { className: 'user-area' });
+  const badgeText = S.user.role === 'master' ? '\u5e08\u5085' : '\u5f92\u5f1f';
+  ua.appendChild(h('span', { className: 'badge' }, badgeText));
+  ua.appendChild(h('span', {}, S.user.username));
+  ua.appendChild(h('button', { onClick: () => { S.token = ''; S.user = null; S.activeTab = 'overview'; localStorage.removeItem('token'); render(); } }, '\u9000\u51fa'));
+  bar.appendChild(ua);
+  app.appendChild(bar);
+}
+
+// ===== Master View =====
+async function renderMaster(main) {
+  const tabs = [
+    { id: 'overview', label: '\u6982\u89c8' },
+    { id: 'ingest', label: '\u6295\u5582\u8d44\u6599' },
+    { id: 'knowledge', label: '\u77e5\u8bc6\u5e93' },
+    { id: 'apprentices', label: '\u5f92\u5f1f\u7ba1\u7406' },
+    { id: 'dashboard', label: '\u5b66\u60c5\u770b\u677f' },
+  ];
+  const tabsDiv = h('div', { className: 'view-tabs' });
+  tabs.forEach(t => {
+    const tb = h('div', { className: 'view-tab' + (S.activeTab === t.id ? ' active' : ''),
+      onClick: () => setView(t.id) }, t.label);
+    tabsDiv.appendChild(tb);
+  });
+  main.appendChild(tabsDiv);
+
+  const content = h('div', { id: 'master-content' });
+  main.appendChild(content);
+
+  switch (S.activeTab) {
+    case 'overview': await renderMasterOverview(content); break;
+    case 'ingest': renderIngest(content); break;
+    case 'knowledge': await renderKnowledge(content); break;
+    case 'apprentices': await renderApprentices(content); break;
+    case 'dashboard': await renderDashboard(content); break;
+  }
+}
+
+async function renderMasterOverview(content) {
+  const connRes = await _loadKnowledge();
+  const appRes = await apiGet('/api/master/apprentices');
+  const dimCount = connRes?.dimensions?.length || 0;
+  const ptCount = connRes?.dimensions?.reduce((s, d) => s + (d.points?.length || 0), 0) || 0;
+  const appCount = appRes?.apprentices?.length || 0;
+
+  content.appendChild(h('div', { className: 'grid-4' }, [
+    h('div', { className: 'stat-box red-accent' }, [h('div', { className: 'stat-value' }, String(dimCount)), h('div', { className: 'stat-label' }, '\u77e5\u8bc6\u7ef4\u5ea6')]),
+    h('div', { className: 'stat-box green-accent' }, [h('div', { className: 'stat-value' }, String(ptCount)), h('div', { className: 'stat-label' }, '\u77e5\u8bc6\u70b9')]),
+    h('div', { className: 'stat-box amber-accent' }, [h('div', { className: 'stat-value' }, String(appCount)), h('div', { className: 'stat-label' }, '\u5f92\u5f1f\u6570\u91cf')]),
+    h('div', { className: 'stat-box purple-accent' }, [h('div', { className: 'stat-value' }, 'v1.0'), h('div', { className: 'stat-label' }, '\u7cfb\u7edf\u7248\u672c')]),
+  ]));
+
+  content.appendChild(h('div', { className: 'card', style: 'margin-top:16px' }, [
+    h('div', { className: 'card-title' }, '\u5feb\u901f\u64cd\u4f5c'),
+    h('p', { style: 'color:var(--text3);font-size:13px;margin:8px 0 16px' }, '\u6309\u987a\u5e8f\u5b8c\u6210\u4ee5\u4e0b\u6b65\u9aa4\u5373\u53ef\u542f\u52a8\u4e00\u4e2a\u5b8c\u6574\u7684\u5b66\u4e60\u5faa\u73af\uff1a'),
+    h('ol', { style: 'paddingLeft:20px;fontSize:13px;color:var(--text2);lineHeight:2' }, [
+      h('li', {}, [h('a', { href: '#', onClick: e => { e.preventDefault(); setView('ingest'); }, style: 'color:var(--brand-red);font-weight:600' }, '\u6295\u5582\u8d44\u6599'), ' \u2192 \u4e0a\u4f20\u672c\u5730\u6587\u6863\u6216\u535a\u5ba2URL']),
+      h('li', {}, [h('a', { href: '#', onClick: e => { e.preventDefault(); setView('knowledge'); }, style: 'color:var(--brand-red);font-weight:600' }, 'AI\u7cbe\u70bc'), ' \u2192 \u81ea\u52a8\u751f\u6210\u77e5\u8bc6\u7ef4\u5ea6\u4e0e\u8003\u70b9\u6811']),
+      h('li', {}, [h('a', { href: '#', onClick: e => { e.preventDefault(); setView('apprentices'); }, style: 'color:var(--brand-red);font-weight:600' }, '\u521b\u5efa\u5f92\u5f1f'), ' \u2192 \u4e3a\u5b66\u5f92\u6ce8\u518c\u8d26\u53f7']),
+      h('li', {}, '\u751f\u6210\u8ba1\u5212 \u2192 \u6307\u5b9a\u5b66\u5f92\uff0cAI\u81ea\u52a8\u6392\u8bfe'),
+      h('li', {}, [h('a', { href: '#', onClick: e => { e.preventDefault(); setView('dashboard'); }, style: 'color:var(--brand-red);font-weight:600' }, '\u5b66\u60c5\u770b\u677f'), ' \u2192 \u8ffd\u8e2a\u5f92\u5f1f\u5b66\u4e60\u8fdb\u5c55']),
+    ]),
+  ]));
+}
+
+function renderIngest(content) {
+  content.appendChild(h('div', { className: 'section-title' }, '\u6295\u5582\u8d44\u6599'));
+
+  const card1 = h('div', { className: 'card' });
+  card1.appendChild(h('div', { className: 'card-title' }, '\u672c\u5730\u6587\u4ef6\u5939\u6295\u5582'));
+  card1.appendChild(h('p', { style: 'color:var(--text3);fontSize:12px;margin:4px 0 10px' }, '\u8f93\u5165\u5305\u542b md/txt/pdf/docx/\u4ee3\u7801\u7684\u6587\u4ef6\u5939\u8def\u5f84'));
+  const pathInput = h('input', { type: 'text', placeholder: '\u4f8b\u5982: C:\\Users\\TS\\Desktop\\\u5165\u804c\u5b66\u4e60', style: 'width:100%;padding:8px 12px;border:1.5px solid var(--border);border-radius:6px;margin-bottom:10px;' });
+  card1.appendChild(pathInput);
+  const msg1 = h('div');
+  card1.appendChild(msg1);
+  card1.appendChild(h('button', { className: 'btn btn-primary', onClick: async () => {
+    const path = pathInput.value.trim();
+    if (!path) return;
+    msg1.innerHTML = '<span class="spinner"></span> \u6b63\u5728\u6444\u5165...';
+    const res = await apiPost('/api/master/ingest', { path });
+    msg1.innerHTML = res.success ? `<div class="msg msg-success">${res.message}</div>` : `<div class="msg msg-error">${res.message}</div>`;
+  } }, '\u5f00\u59cb\u6295\u5582'));
+  content.appendChild(card1);
+
+  const card2 = h('div', { className: 'card' });
+  card2.appendChild(h('div', { className: 'card-title' }, '\u535a\u5ba2URL\u6295\u5582'));
+  card2.appendChild(h('p', { style: 'color:var(--text3);fontSize:12px;margin:4px 0 10px' }, '\u8f93\u5165\u516c\u5f00\u7f51\u9875URL\uff0cAI\u81ea\u52a8\u6293\u53d6\u6b63\u6587\u5e76\u7cbe\u70bc\uff08\u6bcf\u884c\u4e00\u4e2a\uff09'));
+  const urlInput = h('textarea', { placeholder: 'https://example.com/article1\nhttps://example.com/article2', style: 'width:100%;padding:8px 12px;border:1.5px solid var(--border);border-radius:6px;minHeight:80px;marginBottom:10px;fontSize:13px;' });
+  card2.appendChild(urlInput);
+  const msg2 = h('div');
+  card2.appendChild(msg2);
+  card2.appendChild(h('button', { className: 'btn btn-primary', onClick: async () => {
+    const urls = urlInput.value.trim().split('\n').filter(u => u.trim());
+    if (!urls.length) return;
+    msg2.innerHTML = '<span class="spinner"></span> \u6b63\u5728\u6293\u53d6\u7f51\u9875\u6b63\u6587...';
+    const res = await apiPost('/api/master/ingest/url', { urls });
+    msg2.innerHTML = res.success ? `<div class="msg msg-success">${res.message}</div>` : `<div class="msg msg-error">${res.message}</div>`;
+  } }, '\u6293\u53d6\u5e76\u6295\u5582'));
+  content.appendChild(card2);
+
+  const card3 = h('div', { className: 'card' });
+  card3.appendChild(h('div', { className: 'card-title' }, '\u5feb\u901f\u6f14\u793a\uff08\u4e00\u952e\u52a0\u8f7d\u793a\u4f8b\u77e5\u8bc6\u5e93\uff09'));
+  card3.appendChild(h('p', { style: 'color:var(--text3);fontSize:12px;margin:4px 0 10px' }, '\u4f7f\u7528\u5185\u7f6e\u7684\u201c\u667a\u80fd\u8ba2\u5355\u4ea4\u6613\u7cfb\u7edf\u201d\u793a\u4f8b\u77e5\u8bc6\u5e93\uff0c\u65e0\u9700\u81ea\u5907\u8d44\u6599\u5373\u53ef\u6f14\u793a'));
+  card3.appendChild(h('button', { className: 'btn btn-outline', onClick: async () => {
+    const res = await apiPost('/api/master/ingest', { path: 'data/sample_kb' });
+    alert(res.message);
+  } }, '\u52a0\u8f7d\u793a\u4f8b\u77e5\u8bc6\u5e93'));
+  content.appendChild(card3);
+}
+
+async function renderKnowledge(content) {
+  content.appendChild(h('div', { className: 'section-title' }, '\u77e5\u8bc6\u5e93\u7ba1\u7406'));
+
+  const refineBtn = h('button', { className: 'btn btn-success', style: 'margin-bottom:16px', onClick: async () => {
+    refineBtn.disabled = true;
+    refineBtn.innerHTML = '<span class="spinner"></span> AI\u7cbe\u70bc\u4e2d...';
+    const res = await apiPost('/api/master/refine', {});
+    refineBtn.disabled = false;
+    refineBtn.textContent = '\u89e6\u53d1 AI \u7cbe\u70bc';
+    if (res.success) { await renderKnowledge(content); }
+    else { alert(res.message || '\u7cbe\u70bc\u5931\u8d25'); }
+  } }, '\u89e6\u53d1 AI \u7cbe\u70bc');
+  content.appendChild(refineBtn);
+  content.appendChild(h('span', { style: 'color:var(--text3);fontSize:12px;marginLeft:10px' }, '\u2014\u2014 \u6295\u5582\u8d44\u6599\u540e\u70b9\u51fb\u6b64\u6309\u94ae\uff0cAI\u81ea\u52a8\u751f\u6210\u77e5\u8bc6\u7ef4\u5ea6\u4e0e\u8003\u70b9\u6811'));
+
+  const data = await _loadKnowledge();
+  if (!data || !data.dimensions || data.dimensions.length === 0) {
+    content.appendChild(h('div', { className: 'msg msg-info' }, '\u6682\u65e0\u77e5\u8bc6\u5e93\u5185\u5bb9\u3002\u8bf7\u5148\u6295\u5582\u8d44\u6599\uff0c\u518d\u70b9\u51fb\u201c\u89e6\u53d1 AI \u7cbe\u70bc\u201d\u3002'));
+    return;
+  }
+
+  content.appendChild(h('p', { style: 'fontSize:14px;margin:12px 0 6px;color:var(--text2)' }, `\u5171 ${data.dimensions.length} \u4e2a\u77e5\u8bc6\u7ef4\u5ea6`));
+
+  data.dimensions.forEach(d => {
+    const div = h('div', { className: 'ktree-dim' });
+    div.appendChild(h('div', { className: 'dim-name' }, d.name));
+    div.appendChild(h('div', { className: 'dim-desc' }, d.description || ''));
+    const ptsDiv = h('div');
+    (d.points || []).forEach(p => {
+      const levelTag = p.level === '\u7cbe\u901a' ? 'tag-green' : p.level === '\u719f\u7ec3' ? 'tag-red' : 'tag-gray';
+      ptsDiv.appendChild(h('span', { className: 'ktree-point' }, `${p.title} ` + h('span', { className: 'tag ' + levelTag }, p.level)));
+    });
+    div.appendChild(ptsDiv);
+    content.appendChild(div);
+  });
+}
+
+async function _loadKnowledge() {
+  const res = await apiGet('/api/master/knowledge');
+  return res.success ? res : { dimensions: [] };
+}
+
+async function renderApprentices(content) {
+  content.appendChild(h('div', { className: 'section-title' }, '\u5f92\u5f1f\u7ba1\u7406'));
+
+  const card = h('div', { className: 'card' });
+  card.appendChild(h('div', { className: 'card-title' }, '\u521b\u5efa\u5f92\u5f1f\u8d26\u53f7'));
+  const fg1 = h('div', { className: 'form-group' });
+  fg1.appendChild(h('label', {}, '\u7528\u6237\u540d'));
+  const uInput = h('input', { type: 'text', placeholder: '\u65b0\u5f92\u5f1f\u7528\u6237\u540d', id: 'new-appr-name' });
+  fg1.appendChild(uInput);
+  card.appendChild(fg1);
+  const fg2 = h('div', { className: 'form-group' });
+  fg2.appendChild(h('label', {}, '\u5bc6\u7801'));
+  const pInput = h('input', { type: 'password', placeholder: '\u8bbe\u7f6e\u5bc6\u7801', id: 'new-appr-pw' });
+  fg2.appendChild(pInput);
+  card.appendChild(fg2);
+  card.appendChild(h('button', { className: 'btn btn-primary', onClick: async () => {
+    const username = $('#new-appr-name').value;
+    const password = $('#new-appr-pw').value;
+    if (!username || !password) return alert('\u8bf7\u586b\u5199\u5b8c\u6574');
+    const res = await apiPost('/api/master/apprentices', { username, password });
+    alert(res.message);
+    if (res.success) await renderApprentices(content);
+  } }, '\u521b\u5efa\u5f92\u5f1f'));
+  content.appendChild(card);
+
+  const res = await apiGet('/api/master/apprentices');
+  const apps = res.apprentices || [];
+  if (apps.length === 0) {
+    content.appendChild(h('div', { className: 'msg msg-info' }, '\u6682\u65e0\u5f92\u5f1f\uff0c\u8bf7\u5148\u521b\u5efa\u5f92\u5f1f\u8d26\u53f7\u3002'));
+    return;
+  }
+
+  const listCard = h('div', { className: 'card' });
+  listCard.appendChild(h('div', { className: 'card-title' }, `\u5f92\u5f1f\u5217\u8868\uff08${apps.length}\u4eba\uff09`));
+  const tbl = h('table');
+  tbl.innerHTML = `<thead><tr><th>\u7528\u6237\u540d</th><th>\u521b\u5efa\u65f6\u95f4</th><th>\u64cd\u4f5c</th></tr></thead><tbody>${apps.map(a => `
+    <tr>
+      <td>${a.username}</td>
+      <td>${a.created_at || '-'}</td>
+      <td>
+        <button class="btn btn-sm btn-outline" onclick="genPlan(${a.id})">\u751f\u6210\u8ba1\u5212</button>
+        <button class="btn btn-sm btn-outline" onclick="S.activeTab='dashboard';S.data.dashAppr=${a.id};render();" style="margin-left:4px">\u5b66\u60c5\u770b\u677f</button>
+      </td>
+    </tr>`).join('')}</tbody>`;
+  listCard.appendChild(tbl);
+  content.appendChild(listCard);
+}
+
+window.genPlan = async function(apprId) {
+  if (!confirm('\u786e\u8ba4\u4e3a\u6b64\u5f92\u5f1f\u751f\u6210AI\u5b66\u4e60\u8ba1\u5212\uff1f')) return;
+  const res = await apiPost('/api/master/plan/generate', { apprentice_id: apprId });
+  alert(res.message || (res.success ? '\u8ba1\u5212\u751f\u6210\u6210\u529f\uff01' : '\u8ba1\u5212\u751f\u6210\u5931\u8d25'));
+  if (res.success) { S.activeTab = 'dashboard'; S.data.dashAppr = apprId; render(); }
+};
+
+async function renderDashboard(content) {
+  const apprId = S.data.dashAppr;
+  if (!apprId) {
+    const res = await apiGet('/api/master/apprentices');
+    const apps = res.apprentices || [];
+    if (apps.length === 0) { content.appendChild(h('div', { className: 'msg msg-info' }, '\u8bf7\u5148\u521b\u5efa\u5f92\u5f1f\u8d26\u53f7\u3002')); return; }
+    content.appendChild(h('div', { className: 'section-title' }, '\u9009\u62e9\u8981\u67e5\u770b\u7684\u5f92\u5f1f'));
+    apps.forEach(a => {
+      content.appendChild(h('button', { className: 'btn btn-outline', style: 'margin:4px', onClick: () => { S.data.dashAppr = a.id; render(); } }, a.username));
+    });
+    return;
+  }
+
+  content.appendChild(h('div', { className: 'section-title' }, `\u5b66\u60c5\u770b\u677f - \u5b66\u5f92 #${apprId}`));
+  content.appendChild(h('button', { className: 'btn btn-sm btn-outline', style: 'margin-bottom:12px', onClick: () => { S.data.dashAppr = null; render(); } }, '\u2190 \u8fd4\u56de\u9009\u62e9'));
+
+  const res = await apiGet(`/api/master/dashboard/${apprId}`);
+  if (!res.success) { content.appendChild(h('div', { className: 'msg msg-error' }, res.message)); return; }
+
+  content.appendChild(h('div', { className: 'card-title', style: 'marginBottom:8px' }, '\u77e5\u8bc6\u638c\u63e1\u96f7\u8fbe'));
+  const mastery = res.mastery || [];
+  if (mastery.length > 0) {
+    mastery.forEach(m => {
+      const pct = m.level === '\u719f\u7ec3' ? 90 : m.level === '\u4e86\u89e3' ? 50 : 20;
+      const barCls = m.level === '\u719f\u7ec3' ? 'bar-l3' : m.level === '\u4e86\u89e3' ? 'bar-l2' : 'bar-l1';
+      content.appendChild(h('div', { className: 'mastery-bar' }, [
+        h('span', { className: 'bar-label' }, m.dim_name),
+        h('div', { className: 'bar-track' }, [h('div', { className: 'bar-fill ' + barCls, style: `width:${pct}%` })]),
+        h('span', { style: 'fontSize:12px;width:50px;textAlign:left' }, m.level),
+      ]));
+    });
+  } else {
+    content.appendChild(h('div', { className: 'msg msg-info' }, '\u6682\u672a\u5b8c\u6210\u6478\u5e95\u8003\u8bd5'));
+  }
+
+  const planRes = await apiGet(`/api/master/plan/${apprId}`);
+  if (planRes.success && planRes.days) {
+    content.appendChild(h('div', { className: 'card-title', style: 'margin:16px 0 8px' }, '\u5b66\u4e60\u8ba1\u5212\u65e5\u5386'));
+    const cal = h('div', { className: 'calendar-grid' });
+    planRes.days.forEach(d => {
+      const tasks = d.tasks || [];
+      const day = h('div', { className: 'calendar-day' + (d.locked ? ' today' : '') });
+      day.appendChild(h('div', { className: 'day-num' }, `Day ${d.day_index}`));
+      tasks.slice(0, 3).forEach(t => { day.appendChild(h('div', { className: 'day-task' }, t.title)); });
+      if (tasks.length > 3) day.appendChild(h('div', { className: 'day-task' }, `...\u5171${tasks.length}\u9879`));
+      cal.appendChild(day);
+    });
+    content.appendChild(cal);
+  }
+}
+
+// ===== Apprentice View =====
+async function renderApprentice(main) {
+  const tabs = [
+    { id: 'overview', label: '\u6982\u89c8' },
+    { id: 'assess', label: '\u6478\u5e95\u8003\u8bd5' },
+    { id: 'plan', label: '\u5b66\u4e60\u8ba1\u5212' },
+    { id: 'review', label: '\u5f53\u65e5\u590d\u4e60' },
+    { id: 'mistakes', label: '\u9519\u9898\u672c' },
+    { id: 'leaderboard', label: '\u540c\u95e8\u6218\u51b5' },
+  ];
+  const tabsDiv = h('div', { className: 'view-tabs' });
+  tabs.forEach(t => {
+    const tb = h('div', { className: 'view-tab' + (S.activeTab === t.id ? ' active' : ''),
+      onClick: () => setView(t.id) }, t.label);
+    tabsDiv.appendChild(tb);
+  });
+  main.appendChild(tabsDiv);
+
+  const content = h('div', { id: 'appr-content' });
+  main.appendChild(content);
+
+  switch (S.activeTab) {
+    case 'overview': await renderApprOverview(content); break;
+    case 'assess': await renderAssess(content); break;
+    case 'plan': await renderPlan(content); break;
+    case 'review': await renderReview(content); break;
+    case 'mistakes': await renderMistakes(content); break;
+    case 'leaderboard': await renderLeaderboard(content); break;
+  }
+}
+
+async function renderApprOverview(content) {
+  content.appendChild(h('div', { className: 'section-title' }, '\u5b66\u4e60\u6982\u89c8'));
+  content.appendChild(h('div', { className: 'card' }, [
+    h('div', { className: 'card-title' }, '\u65b0\u624b\u4e0a\u8def'),
+    h('p', { style: 'color:var(--text3);fontSize:13px;margin:8px 0' }, '\u6309\u4ee5\u4e0b\u6b65\u9aa4\u5f00\u542f\u4f60\u7684\u5b66\u4e60\u4e4b\u65c5\uff1a'),
+    h('ol', { style: 'paddingLeft:20px;fontSize:13px;color:var(--text2);lineHeight:2.2' }, [
+      h('li', {}, [h('a', { href: '#', onClick: e => { e.preventDefault(); setView('assess'); }, style: 'color:var(--brand-red);font-weight:600' }, '\u6478\u5e95\u8003\u8bd5'), ' \u2192 \u8ba9AI\u8bc4\u4f30\u4f60\u5f53\u524d\u7684\u77e5\u8bc6\u6c34\u5e73']),
+      h('li', {}, '\u7b49\u5f85\u5e08\u5085\u4e3a\u4f60\u751f\u6210\u4e2a\u6027\u5316\u5b66\u4e60\u8ba1\u5212'),
+      h('li', {}, [h('a', { href: '#', onClick: e => { e.preventDefault(); setView('plan'); }, style: 'color:var(--brand-red);font-weight:600' }, '\u6309\u8ba1\u5212\u5b66\u4e60'), ' \u2192 \u4e0b\u8f7d\u6bcf\u65e5PDF\u8bb2\u4e49']),
+      h('li', {}, [h('a', { href: '#', onClick: e => { e.preventDefault(); setView('review'); }, style: 'color:var(--brand-red);font-weight:600' }, '\u5f53\u65e5\u590d\u4e60'), ' \u2192 \u68c0\u9a8c\u5b66\u4e60\u6210\u679c']),
+      h('li', {}, [h('a', { href: '#', onClick: e => { e.preventDefault(); setView('leaderboard'); }, style: 'color:var(--brand-red);font-weight:600' }, '\u540c\u95e8\u6218\u51b5'), ' \u2192 \u770b\u770b\u5e08\u5144\u5f1f\u4eec\u7684\u8fdb\u5ea6']),
+    ]),
+  ]));
+
+  const mRes = await apiGet('/api/apprentice/mistakes');
+  if (mRes.success) {
+    const aCount = (mRes.assess_mistakes || []).length;
+    const rCount = (mRes.review_mistakes || []).length;
+    content.appendChild(h('div', { className: 'grid-2', style: 'marginTop:16px' }, [
+      h('div', { className: 'stat-box red-accent' }, [h('div', { className: 'stat-value' }, String(aCount + rCount)), h('div', { className: 'stat-label' }, '\u9519\u9898\u603b\u6570')]),
+      h('div', { className: 'stat-box green-accent' }, [h('div', { className: 'stat-value' }, String(aCount)), h('div', { className: 'stat-label' }, '\u8003\u8bd5\u9519\u9898 / ' + String(rCount) + ' \u590d\u4e60\u9519\u9898')]),
+    ]));
+  }
+}
+
+// ===== Assessment =====
+async function renderAssess(content) {
+  content.appendChild(h('div', { className: 'section-title' }, '\u6478\u5e95\u8003\u8bd5'));
+
+  if (!S.data.assessment) {
+    content.appendChild(h('p', { style: 'color:var(--text3);fontSize:13px;marginBottom:12px' }, 'AI\u5c06\u57fa\u4e8e\u5e08\u5085\u7684\u77e5\u8bc6\u5e93\u4e3a\u4f60\u51fa\u9898\uff0c\u6db5\u76d6\u5404\u77e5\u8bc6\u7ef4\u5ea6\uff0c\u7531\u6613\u5230\u96be\u9010\u6b65\u8bc4\u6d4b\u3002'));
+    content.appendChild(h('button', { className: 'btn btn-primary', onClick: async () => {
+      const btn = event.target;
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner"></span> AI\u51fa\u9898\u4e2d...';
+      const res = await apiPost('/api/apprentice/assessment/start', {});
+      btn.disabled = false;
+      btn.textContent = '\u5f00\u59cb\u6478\u5e95\u8003\u8bd5';
+      if (res.success) { S.data.assessment = res; S.data.assessIdx = 0; render(); }
+      else { alert(res.message || '\u51fa\u9898\u5931\u8d25'); }
+    } }, '\u5f00\u59cb\u6478\u5e95\u8003\u8bd5'));
+    return;
+  }
+
+  const ass = S.data.assessment;
+  const idx = S.data.assessIdx || 0;
+  const questions = ass.questions || [];
+
+  if (idx >= questions.length) {
+    content.appendChild(h('div', { className: 'msg msg-success' }, '\u6478\u5e95\u8003\u8bd5\u5b8c\u6210\uff01'));
+    const res = await apiGet(`/api/apprentice/assessment/result/${ass.assessment_id}`);
+    if (res.success && res.mastery) {
+      content.appendChild(h('div', { className: 'card-title', style: 'marginTop:12px' }, '\u638c\u63e1\u7b49\u7ea7'));
+      res.mastery.forEach(m => {
+        const pct = m.level === '\u719f\u7ec3' ? 90 : m.level === '\u4e86\u89e3' ? 50 : 20;
+        const barCls = m.level === '\u719f\u7ec3' ? 'bar-l3' : m.level === '\u4e86\u89e3' ? 'bar-l2' : 'bar-l1';
+        content.appendChild(h('div', { className: 'mastery-bar' }, [
+          h('span', { className: 'bar-label' }, m.dim_name),
+          h('div', { className: 'bar-track' }, [h('div', { className: 'bar-fill ' + barCls, style: `width:${pct}%` })]),
+          h('span', { style: 'fontSize:12px;width:50px' }, m.level),
+        ]));
+      });
+    }
+    content.appendChild(h('button', { className: 'btn btn-outline', style: 'marginTop:12px', onClick: () => { S.data.assessment = null; render(); } }, '\u91cd\u65b0\u8003\u8bd5'));
+    return;
+  }
+
+  const q = questions[idx];
+  content.appendChild(h('div', { style: 'color:var(--text3);fontSize:12px;marginBottom:8px' }, `\u9898\u76ee ${idx + 1} / ${questions.length}`));
+
+  const qi = h('div', { className: 'quest-item' });
+  qi.appendChild(h('div', { className: 'q-header' }, [
+    h('span', { className: 'tag ' + (q.difficulty === '\u6613' ? 'tag-green' : q.difficulty === '\u96be' ? 'tag-danger' : 'tag-amber') }, q.difficulty),
+    h('span', { className: 'tag tag-red' }, q.qtype === 'choice' ? '\u9009\u62e9' : '\u7b80\u7b54'),
+  ]));
+  qi.appendChild(h('div', { className: 'q-text' }, q.question));
+
+  if (q.qtype === 'choice' && q.options) {
+    const optsDiv = h('div', { className: 'q-options' });
+    (Array.isArray(q.options) ? q.options : []).forEach(opt => {
+      optsDiv.appendChild(h('label', {}, [h('input', { type: 'radio', name: `q-${q.id}`, value: opt.charAt(0) }), ' ' + opt]));
+    });
+    qi.appendChild(optsDiv);
+  } else {
+    qi.appendChild(h('textarea', { placeholder: '\u8bf7\u8f93\u5165\u4f60\u7684\u7b54\u6848...', id: `ans-${q.id}` }));
+  }
+  content.appendChild(qi);
+
+  content.appendChild(h('button', { className: 'btn btn-primary', id: 'submit-ans', onClick: async () => {
+    let answer;
+    if (q.qtype === 'choice') {
+      const checked = document.querySelector(`input[name="q-${q.id}"]:checked`);
+      if (!checked) return alert('\u8bf7\u9009\u62e9\u4e00\u4e2a\u9009\u9879');
+      answer = checked.value;
+    } else {
+      answer = $(`#ans-${q.id}`).value;
+      if (!answer.trim()) return alert('\u8bf7\u8f93\u5165\u7b54\u6848');
+    }
+    const btn = $('#submit-ans');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span> \u6279\u6539\u4e2d...';
+    const res = await apiPost('/api/apprentice/assessment/answer', { question_id: q.id, answer });
+    btn.disabled = false;
+    if (res.success) {
+      const fbCls = res.is_correct ? 'fb-correct' : 'fb-wrong';
+      qi.appendChild(h('div', { className: 'feedback ' + fbCls }, `\u5f97\u5206: ${res.score} | ${res.feedback}`));
+      btn.textContent = '\u4e0b\u4e00\u9898 \u2192';
+      btn.onclick = () => { S.data.assessIdx = idx + 1; render(); };
+    } else {
+      alert(res.message || '\u63d0\u4ea4\u5931\u8d25');
+    }
+  } }, '\u63d0\u4ea4\u7b54\u6848'));
+}
+
+// ===== Plan =====
+async function renderPlan(content) {
+  content.appendChild(h('div', { className: 'section-title' }, '\u5b66\u4e60\u8ba1\u5212'));
+
+  const res = await apiGet('/api/apprentice/plan/today');
+  if (!res.success || !res.today) {
+    content.appendChild(h('div', { className: 'msg msg-info' }, '\u6682\u65e0\u5b66\u4e60\u8ba1\u5212\uff0c\u8bf7\u8054\u7cfb\u5e08\u5085\u4e3a\u60a8\u751f\u6210\u3002'));
+    return;
+  }
+
+  const today = res.today;
+  const tasks = today.tasks || [];
+
+  content.appendChild(h('div', { className: 'card' }, [
+    h('div', { className: 'card-header' }, [
+      h('div', { className: 'card-title' }, `\u4eca\u65e5\u5b66\u4e60 (Day ${today.day_index} - ${today.date || ''})`),
+      h('button', { className: 'btn btn-sm btn-primary', onClick: () => {
+        window.open('/api/apprentice/pdf/today', '_blank');
+      } }, '\u4e0b\u8f7dPDF\u8bb2\u4e49'),
+    ]),
+    today.note ? h('p', { style: 'color:var(--text3);fontSize:13px;marginBottom:10px' }, today.note) : '',
+    tasks.length ? tasks.map(t => h('div', { style: 'padding:8px 0;borderBottom:1px solid var(--border);display:flex;justifyContent:spaceBetween;alignItems:center' }, [
+      h('div', {}, [
+        h('span', { className: 'tag tag-red', style: 'marginRight:6px' }, t.task_type),
+        h('span', { style: 'fontWeight:600' }, t.title),
+        t.dim_name ? h('span', { style: 'color:var(--text3);fontSize:11px;marginLeft:6px' }, `[${t.dim_name}]`) : '',
+      ]),
+      h('span', { style: 'fontSize:12px;color:var(--text3)' }, `${t.duration_min}\u5206\u949f`),
+    ])) : h('div', { className: 'msg msg-info' }, '\u4eca\u65e5\u65e0\u5b66\u4e60\u4efb\u52a1'),
+    h('div', { style: 'textAlign:right;marginTop:8px;fontSize:12px;color:var(--text3)' }, `\u603b\u65f6\u957f: ${tasks.reduce((s, t) => s + (t.duration_min || 0), 0)} \u5206\u949f`),
+  ]));
+
+  // AI chat
+  content.appendChild(h('div', { className: 'card', style: 'marginTop:16px' }, [
+    h('div', { className: 'card-title' }, 'AI\u966a\u7ec3\u7b54\u7591'),
+    h('div', { id: 'chat-messages', style: 'maxHeight:300px;overflowY:auto;marginBottom:10px;padding:8px;background:var(--surface2);borderRadius:8px;minHeight:80px' }),
+    h('div', { style: 'display:flex;gap:8px' }, [
+      h('input', { type: 'text', id: 'chat-input', placeholder: '\u5411AI\u5bfc\u5e08\u63d0\u95ee...', style: 'flex:1;padding:8px 12px;border:1.5px solid var(--border);border-radius:6px;font-size:13px' }),
+      h('button', { className: 'btn btn-primary btn-sm', onClick: async () => {
+        const q = $('#chat-input').value.trim();
+        if (!q) return;
+        const msgs = $('#chat-messages');
+        msgs.appendChild(h('div', { style: 'textAlign:right;margin:4px 0;color:var(--brand-red);fontSize:13px;fontWeight:600' }, '\u4f60: ' + q));
+        $('#chat-input').value = '';
+        const res = await apiPost('/api/apprentice/ask', { question: q });
+        if (res.success) {
+          msgs.appendChild(h('div', { style: 'margin:4px 0;fontSize:13px;background:var(--surface);padding:8px;borderRadius:6px;whiteSpace:preWrap' }, 'AI\u5bfc\u5e08: ' + (res.answer || '...')));
+        }
+        msgs.scrollTop = msgs.scrollHeight;
+      } }, '\u53d1\u9001'),
+    ]),
+  ]));
+}
+
+// ===== Review =====
+async function renderReview(content) {
+  content.appendChild(h('div', { className: 'section-title' }, '\u5f53\u65e5\u590d\u4e60'));
+
+  if (!S.data.review) {
+    const planRes = await apiGet('/api/apprentice/plan/today');
+    if (!planRes.success || !planRes.today) {
+      content.appendChild(h('div', { className: 'msg msg-info' }, '\u6682\u65e0\u4eca\u65e5\u5b66\u4e60\u8ba1\u5212'));
+      return;
+    }
+    const dayId = planRes.today.id;
+
+    content.appendChild(h('button', { className: 'btn btn-primary', onClick: async () => {
+      const btn = event.target;
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner"></span> AI\u51fa\u590d\u4e60\u9898...';
+      const res = await apiPost('/api/apprentice/review/start', { plan_day_id: dayId });
+      btn.disabled = false;
+      btn.textContent = '\u5f00\u59cb\u5f53\u65e5\u590d\u4e60';
+      if (res.success) { S.data.review = res; S.data.reviewIdx = 0; render(); }
+      else { alert(res.message); }
+    } }, '\u5f00\u59cb\u5f53\u65e5\u590d\u4e60'));
+    return;
+  }
+
+  const rev = S.data.review;
+  const idx = S.data.reviewIdx || 0;
+  const questions = rev.questions || [];
+
+  if (idx >= questions.length) {
+    content.appendChild(h('div', { className: 'msg msg-success' }, '\u590d\u4e60\u5b8c\u6210\uff01'));
+    content.appendChild(h('button', { className: 'btn btn-outline', onClick: () => { S.data.review = null; render(); } }, '\u518d\u6b21\u590d\u4e60'));
+    return;
+  }
+
+  const q = questions[idx];
+  content.appendChild(h('div', { style: 'color:var(--text3);fontSize:12px;marginBottom:8px' }, `\u590d\u4e60\u9898 ${idx + 1} / ${questions.length}`));
+  const qi = h('div', { className: 'quest-item' });
+  qi.appendChild(h('div', { className: 'q-header' }, [
+    h('span', { className: 'tag tag-red' }, q.qtype === 'choice' ? '\u9009\u62e9' : '\u7b80\u7b54'),
+    h('span', { style: 'fontSize:11px;color:var(--text3)' }, `${q.max_score || 20}\u5206`),
+  ]));
+  qi.appendChild(h('div', { className: 'q-text' }, q.question));
+
+  if (q.qtype === 'choice' && q.options) {
+    const optsDiv = h('div', { className: 'q-options' });
+    (Array.isArray(q.options) ? q.options : []).forEach(opt => {
+      optsDiv.appendChild(h('label', {}, [h('input', { type: 'radio', name: `rq-${q.id}`, value: opt.charAt(0) }), ' ' + opt]));
+    });
+    qi.appendChild(optsDiv);
+  } else {
+    qi.appendChild(h('textarea', { placeholder: '\u8bf7\u8f93\u5165\u7b54\u6848...', id: `rans-${q.id}` }));
+  }
+  content.appendChild(qi);
+
+  content.appendChild(h('button', { className: 'btn btn-primary', id: 'submit-rev', onClick: async () => {
+    let answer;
+    if (q.qtype === 'choice') {
+      const checked = document.querySelector(`input[name="rq-${q.id}"]:checked`);
+      if (!checked) return alert('\u8bf7\u9009\u62e9');
+      answer = checked.value;
+    } else {
+      answer = $(`#rans-${q.id}`).value;
+      if (!answer.trim()) return alert('\u8bf7\u8f93\u5165\u7b54\u6848');
+    }
+    const btn = $('#submit-rev');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span> \u6279\u6539\u4e2d...';
+    const res = await apiPost('/api/apprentice/review/answer', { question_id: q.id, answer, review_id: rev.review_id });
+    btn.disabled = false;
+    if (res.success) {
+      qi.appendChild(h('div', { className: 'feedback ' + (res.score >= 60 ? 'fb-correct' : 'fb-wrong') }, `\u5f97\u5206: ${res.score} | ${res.feedback}\n\u6807\u51c6\u7b54\u6848: ${res.answer_key}`));
+      btn.textContent = '\u4e0b\u4e00\u9898 \u2192';
+      btn.onclick = () => { S.data.reviewIdx = idx + 1; render(); };
+    } else {
+      alert(res.message);
+    }
+  } }, '\u63d0\u4ea4'));
+}
+
+// ===== Mistakes =====
+async function renderMistakes(content) {
+  content.appendChild(h('div', { className: 'section-title' }, '\u6211\u7684\u9519\u9898\u672c'));
+
+  const res = await apiGet('/api/apprentice/mistakes');
+  if (!res.success) return;
+
+  const allMistakes = [...(res.assess_mistakes || []), ...(res.review_mistakes || [])];
+  if (allMistakes.length === 0) {
+    content.appendChild(h('div', { className: 'msg msg-success' }, '\u592a\u68d2\u4e86\uff01\u76ee\u524d\u6ca1\u6709\u9519\u9898\u8bb0\u5f55\u3002'));
+    return;
+  }
+
+  allMistakes.forEach(m => {
+    const div = h('div', { className: 'card' });
+    div.appendChild(h('div', { className: 'card-title' }, m.question || '\u9898\u76ee'));
+    div.appendChild(h('div', { style: 'fontSize:13px;color:var(--text2);margin:4px 0' }, `\u4f60\u7684\u56de\u7b54: ${m.apprentice_answer || '\u672a\u4f5c\u7b54'}`));
+    div.appendChild(h('div', { style: 'fontSize:13px;color:var(--success)' }, `\u6b63\u786e\u7b54\u6848: ${m.answer_key || '-'}`));
+    div.appendChild(h('div', { style: 'fontSize:12px;color:var(--text3);marginTop:4px' }, `\u5f97\u5206: ${m.score || 0} | ${m.feedback || ''}`));
+    content.appendChild(div);
+  });
+}
+
+// ===== Leaderboard =====
+async function renderLeaderboard(content) {
+  content.appendChild(h('div', { className: 'section-title' }, '\u540c\u95e8\u6218\u51b5'));
+  content.appendChild(h('p', { style: 'color:var(--text3);fontSize:13px;marginBottom:14px' }, '\u540c\u4e00\u5e08\u5085\u95e8\u4e0b\u7684\u5f92\u5f1f\u4e92\u76f8\u53ef\u89c1\uff0c\u6fc0\u53d1\u7ade\u6280\u52a8\u529b\uff01'));
+
+  const res = await apiGet('/api/apprentice/leaderboard');
+  if (!res.success) { content.appendChild(h('div', { className: 'msg msg-info' }, res.message || '\u6682\u65e0\u6570\u636e')); return; }
+
+  const lb = res.leaderboard || [];
+  lb.forEach((item, i) => {
+    const rank = i + 1;
+    const rankCls = rank === 1 ? 'rank-1' : rank === 2 ? 'rank-2' : rank === 3 ? 'rank-3' : 'rank-other';
+    const isMe = item.apprentice_id === res.my_id;
+    const div = h('div', { className: 'leaderboard-item', style: isMe ? 'border:2px solid var(--brand-red);background:var(--brand-red-light)' : '' });
+    div.appendChild(h('div', { className: 'leaderboard-rank ' + rankCls }, String(rank)));
+    div.appendChild(h('div', { style: 'flex:1' }, [
+      h('span', { style: 'fontWeight:700' }, item.username + (isMe ? ' (\u6211)' : '')),
+      h('div', { style: 'fontSize:11px;color:var(--text3)' }, `\u5747\u5206: ${item.avg_score} | \u719f\u7ec3\u7ef4\u5ea6: ${item.mastery_count} | \u9519\u9898: ${item.mistake_count}`),
+    ]));
+    div.appendChild(h('div', { className: 'tag tag-green' }, item.avg_score + '\u5206'));
+    content.appendChild(div);
+  });
+}
+
+// ===== Init =====
+(async function init() {
+  if (S.token) {
+    try {
+      const res = await apiGet('/api/me');
+      if (res.success) S.user = res.user;
+      else { S.token = ''; localStorage.removeItem('token'); }
+    } catch(e) { S.token = ''; localStorage.removeItem('token'); }
+  }
+  render();
+})();
+</script>
+</body>
+</html>
