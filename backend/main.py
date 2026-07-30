@@ -14,8 +14,12 @@ from backend.auth import (register, login, logout, get_user, require_master, req
                             get_company_users, assign_master, create_post, get_posts,
                             get_apprentice_stats)
 from backend.schemas import (LoginReq, RegisterReq, CreateApprenticeReq, IngestPathReq, IngestUrlReq,
+
                              PlanGenerateReq, AssessmentAnswerReq, ChatReq, CompanyPostReq, AssignMasterReq,
                              PasswordResetRequestReq, PasswordResetReq)
+
+                             PlanGenerateReq, AssessmentAnswerReq, ChatReq, CompanyPostReq, AssignMasterReq)
+
 from backend.vectorstore import VectorStore
 from backend.ingest import ingest_local_path, ingest_urls, get_or_create_kb
 from backend.agents.refiner import refine
@@ -26,6 +30,7 @@ from backend.agents.reviewer import generate_review, grade_review_answer
 from backend.pdf_gen import generate_today_pdf
 
 app = FastAPI(title="薪火·师傅带徒 AI 导师系统", version="1.0.0")
+
 
 # ---------- P1 添加密码重置模块占位 ----------
 try:
@@ -41,6 +46,7 @@ try:
 except ImportError:
     def notify(*args, **kwargs):
         return True
+
 
 # 全局向量库实例
 _store: VectorStore | None = None
@@ -84,6 +90,7 @@ def startup():
     conn.execute("UPDATE users SET company_id=1 WHERE company_id IS NULL")
     conn.commit()
     print("薪火系统启动完成 -> http://localhost:8000")
+
 
 
 # ========== P1 新增：密码重置接口（修正：使用 get_conn 而非 get_store） ==========
@@ -580,6 +587,7 @@ def api_submit_quiz(data: dict, user: dict = Depends(auth_user)):
     """徒弟提交检测，AI初评。可反复提交（attempt递增）。"""
     if not require_apprentice(user):
         raise HTTPException(status_code=403, detail="仅徒弟可操作")
+
     
     conn = get_conn()
     item = conn.execute(
@@ -627,6 +635,25 @@ def api_submit_quiz(data: dict, user: dict = Depends(auth_user)):
         "ai_score": ai_score,
         "message": "检测已提交，AI初评完成，等待师傅终评"
     }
+ conn = get_conn()
+    item = conn.execute("SELECT pi.*, p.apprentice_id FROM plan_items pi JOIN plans p ON pi.plan_id=p.id WHERE pi.id=? AND p.apprentice_id=?",
+                        (data["plan_item_id"], user["user_id"])).fetchone()
+    if not item:
+        return {"success": False, "message": "无此学习任务"}
+    # attempt递增
+    last = conn.execute("SELECT MAX(attempt) as m FROM quizzes WHERE apprentice_id=? AND plan_item_id=?",
+                        (user["user_id"], data["plan_item_id"])).fetchone()
+    attempt = (last["m"] or 0) + 1
+    # AI评分（简化：根据答案长度打分；实际应调LLM）
+    answer = data.get("answer", "")
+    ai_score = min(100, max(10, len(answer) * 2 if answer else 0))
+    cur = conn.execute(
+        "INSERT INTO quizzes (apprentice_id, plan_item_id, attempt, answer, ai_score, status) VALUES (?, ?, ?, ?, ?, 'pending_review')",
+        (user["user_id"], data["plan_item_id"], attempt, answer, ai_score))
+    conn.commit()
+    return {"success": True, "quiz_id": cur.lastrowid, "attempt": attempt, "ai_score": ai_score,
+            "message": "检测已提交，AI初评完成，等待师傅终评"}
+
 
 
 @app.get("/api/apprentice/quizzes")
@@ -1016,4 +1043,7 @@ def api_purification_report(user: dict = Depends(auth_user)):
 def api_purification_stats(user: dict = Depends(auth_user)):
     """获取知识库健康统计"""
     from backend.self_purifier import get_purification_stats
+
+    return get_purification_stats()
+
     return get_purification_stats()

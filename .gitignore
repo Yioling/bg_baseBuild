@@ -27,3 +27,18 @@ backend/data/mentor.db
 desktop.ini
 .DS_Store
 Thumbs.db
+
+# 构建产物 / 打包（不要进仓库）
+build/
+dist/
+*.spec.bak
+*.toc
+*.zip
+*.exe
+
+# 本地数据库（运行时生成，不属于源码）
+*.db
+backend/data/
+
+# AI 工具缓存
+.codebuddy/

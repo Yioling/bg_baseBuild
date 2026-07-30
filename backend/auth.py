@@ -4,6 +4,7 @@ import secrets
 from datetime import datetime
 from backend.db import get_conn
 
+
 # ---------- P1 添加通知占位（等待 P7 合并） ----------
 try:
     from modules.notification import notify
@@ -11,6 +12,7 @@ except ImportError:
     def notify(*args, **kwargs):
         print(f"📢 [P1占位通知] 参数: {args} {kwargs}")
         return True
+
 
 # 简单的基于 token 的鉴权（无需 JWT 库依赖）
 _tokens: dict[str, dict] = {}  # token -> {user_id, username, role, ...}
@@ -63,6 +65,7 @@ def register(username: str, password: str, role: str, master_id: int | None = No
         conn.commit()
         uid = cur.lastrowid
 
+
         # ===== P1 新增：注册待审通知（PO需求） =====
         try:
             # 这里的 notify 已经在文件顶部导入（或占位）
@@ -79,7 +82,9 @@ def register(username: str, password: str, role: str, master_id: int | None = No
         return {"success": True, "message": "注册成功，等待公司管理员审核",
                 "user": {"id": uid, "username": username, "role": role, "status": status}}
     except Exception as e:
-
+        return {"success": True, "message": "注册成功，等待公司管理员审核",
+                "user": {"id": uid, "username": username, "role": role, "status": status}}
+    except Exception as e:
         if "UNIQUE" in str(e):
             return {"success": False, "message": "用户名已存在"}
         return {"success": False, "message": str(e)}
