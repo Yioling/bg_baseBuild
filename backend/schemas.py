@@ -108,3 +108,11 @@ class RebindReq(BaseModel):
 
 class DepartmentReq(BaseModel):
     name: str
+
+# ========== P1 新增：密码重置请求模型 ==========
+class PasswordResetRequestReq(BaseModel):
+    email: str
+
+class PasswordResetReq(BaseModel):
+    token: str
+    new_password: str
