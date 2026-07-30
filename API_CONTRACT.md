@@ -1,296 +1,438 @@
-# P2 模块接口契约 · API_CONTRACT.md
+# P2 API_CONTRACT — AI 底座接口文档
 
-> **适用版本**: P2 分支 commit `2f0844f`+  
-> **P2 负责人**: TS  
-> **最后更新**: 2026-07-30
-
----
-
-## 模块概览
-
-P2 负责 4 个文件，是全部 AI 能力和知识检索的底座：
-
-| 文件 | 职责 | 核心能力 |
-|------|------|----------|
-| `backend/llm.py` | LLM 客户端 | 调用大模型、演示模式兜底 |
-| `backend/embeddings.py` | 本地中文嵌入 | 文本→向量 |
-| `backend/vectorstore.py` | 向量库 | 向量存储、相似度检索 |
-| `backend/self_purifier.py` | 知识库自净化 | 脏数据检测与清理 |
+> **维护者**: TS（P2） | **更新**: 2026-07-30 | **分支**: `origin/p2`
+>
+> **给 AI 读的**：每个接口给定了精确 import、调用方式、返回值结构、错误行为。
+> **给人读的**：第五章按你的模块告诉你要 import 什么，第六章是演示模式速查。
 
 ---
 
-## 一、LLM 客户端 (`backend/llm.py`)
+## 速查卡片
 
-### 供 P3（Agent 智能体）、P5（ingest/pdf_gen）、管理员后台 使用
-
+### LLM 调用
 ```python
-from backend.llm import chat, chat_json, use_mock, check_llm_ready
+from backend.llm import chat, chat_json, use_mock
+
+text  = chat("你是导师", "问题", temperature=0.3, max_tokens=1600)
+obj   = chat_json("你是出题官", "输出JSON: {...}")
+mock  = use_mock()  # True=演示模式 False=真实LLM
 ```
 
-#### 1.1 `chat()` — 同步调用 LLM（最常用）
-
+### 文本嵌入
 ```python
-def chat(system: str, user: str, *, temperature: float = 0.3, max_tokens: int = 1600) -> str
+from backend.embeddings import embed, embed_one
+
+vecs  = embed(["文本1","文本2"])          # → list[list[float]]  512维
+vec   = embed_one("单个文本")             # → list[float]        512维
 ```
 
-- **system**: 系统提示词（角色设定）
-- **user**: 用户输入/任务描述
-- **返回**: LLM 回复的纯文本
-- **行为**: 
-  - 无 API Key → 自动进入演示模式，返回内置示例回答
-  - API 调用失败 → 自动重试 3 次（指数退避），全失败则降级到演示模式
-
-**使用示例（P3 Agent 写法）**：
+### 向量检索
 ```python
-from backend.llm import chat, use_mock
+from backend.vectorstore import VectorStore, retrieve_context
+
+store = VectorStore.load("path.pkl")      # 从磁盘加载，不存在返回空库
+store.add(items, vectors)                 # items: [{"text","source","meta"},...]
+hits  = store.search(vec, top_k=5)        # → [{"text","source","score":0.95},...]
+hits  = store.query("自然语言", top_k=5)  # 等价于 embed+search 一步完成
+ctx   = retrieve_context(store, "问题", top_k=5)  # → 拼好的上下文字符串
+store.save("path.pkl")
+```
+
+### 知识库净化（仅 P5 用）
+```python
+from backend.self_purifier import run_purification, get_purification_report, get_purification_stats
+
+run_purification(kb_id=None)       # → dict
+get_purification_report()          # → dict
+get_purification_stats()           # → {"total_chunks":N, "health_pct":98.5,...}
+```
+
+---
+
+## 一、`backend/llm.py` — LLM 客户端
+
+### 1.1 `chat()` — 调大模型拿文本
+
+```python
+from backend.llm import chat
+
+answer: str = chat(
+    system: str,       # 系统提示词
+    user: str,         # 用户输入
+    *,
+    temperature: float = 0.3,
+    max_tokens: int = 1600
+) -> str
+```
+
+**返回值**：纯文本字符串。永远不会抛异常。
+
+**错误行为（对调用方透明）**：
+1. 没配 API Key → 自动走演示模式，返回内置示例文本
+2. API 网络超时 → 自动重试 3 次（间隔 0.5s / 1s / 2s）
+3. 3 次全失败 → 降级到演示模式
+
+**真实代码示例（来自现有 Agent）**：
+```python
+# assessor.py / reviewer.py 批改模式
+from backend.llm import chat
 
 answer = chat(
-    "你是技术导师，用中文回答。",
-    "请解释什么是幂等设计",
+    "你是技术审查专家。判断两段知识是否矛盾，只回答YES或NO。",
+    f"文本A: {text_a[:500]}\n文本B: {text_b[:500]}\n是否存在矛盾？",
+    temperature=0.1,
+    max_tokens=10
+)
+```
+
+```python
+# tutor.py RAG陪练模式
+from backend.llm import chat
+
+answer = chat(
+    TUTOR_SYSTEM,  # "你是薪火导师..." 长提示词
+    f"参考资料：\n{context}\n\n徒弟提问：{question}",
     temperature=0.5,
     max_tokens=800
 )
 ```
 
-#### 1.2 `chat_json()` — 调用 LLM 并解析 JSON
+### 1.2 `chat_json()` — 调大模型拿结构化数据
 
 ```python
-def chat_json(system: str, user: str, *, temperature: float = 0.2) -> dict | list
-```
+from backend.llm import chat_json
 
-- 在 `chat()` 基础上自动做 JSON 解析
-- 内置多层降级：去掉 ```json 围栏 → 精确解析 → 括号匹配截取
-- **返回**: Python dict 或 list（解析失败返回 `{}`）
-
-**使用示例**：
-```python
-result = chat_json(
-    "你是出题官，只输出 JSON。",
-    '请出 3 道选择题。格式: {"questions": [...]}'
+result: dict | list = chat_json(
+    system: str,
+    user: str,
+    *,
+    temperature: float = 0.2
 )
-# result = {"questions": [...]}  # 直接可用
 ```
 
-#### 1.3 `use_mock()` — 判断当前模式
+**返回值**：Python dict 或 list。解析失败返回 `{}`（空 dict）。
 
-```python
-def use_mock() -> bool
+**JSON 解析降级链**（全自动，不用管）：
+```
+原始输出 → 去 ```json 围栏 → json.loads() → 括号匹配截取 → {}
 ```
 
-- 返回 `True` 表示在演示模式（无真实 LLM）
-- P3 Agent 可以用它决定是否跳过 LLM 消耗大的操作
-
-#### 1.4 `check_llm_ready()` — 诊断接口（供管理后台）
-
+**真实代码示例**：
 ```python
-def check_llm_ready() -> dict
-# 返回: {"ready": True/False, "mode": "mock"/"live", "message": "..."}
+# assessor.py 出题模式
+result = chat_json(ASSESS_SYSTEM, f"基于以下知识维度出摸底考试题：\n{dims_json}")
+# result = {"questions": [{"question": "...", "qtype": "choice", ...}, ...]}
+
+# planner.py 计划生成
+result = chat_json(PLAN_SYSTEM, f"根据掌握情况生成学习计划：\n{dims_json}")
+# result = {"plan_overview": "...", "days": [{"day_index": 1, "tasks": [...]}, ...]}
 ```
 
----
-
-## 二、本地中文嵌入 (`backend/embeddings.py`)
-
-### 供 P4（ingest 资料摄取）、P5（自净化）、向量库内部 使用
+### 1.3 `use_mock()` — 判断是否演示模式
 
 ```python
-from backend.embeddings import embed, embed_one, is_ready, get_model_info
+from backend.llm import use_mock
+
+if use_mock():
+    # 当前在演示模式，可以跳过 LLM 消耗大的操作
+    pass
 ```
 
-#### 2.1 `embed()` — 批量嵌入
+### 1.4 `check_llm_ready()` — 诊断（管理后台用）
 
 ```python
-def embed(texts: list[str]) -> list[list[float]]
+from backend.llm import check_llm_ready
+
+status = check_llm_ready()
+# {"ready": True, "mode": "live", "message": "已连接: https://api.deepseek.com/v1"}
+# 或
+# {"ready": True, "mode": "mock", "message": "演示模式..."}
 ```
 
-- **输入**: 文本列表
-- **输出**: 对应向量列表（每个是 512 维 float 列表）
-- **特性**:
-  - 空列表输入 → 返回 `[]`
-  - 含空白字符串 → 对应位置返回零向量，不影响其他文本
-  - 配置模型不可用 → 自动降级 `BAAI/bge-small-zh-v1.5`
-
-#### 2.2 `embed_one()` — 单个嵌入
+### 1.5 异步版本（可选）
 
 ```python
-def embed_one(text: str) -> list[float]
-```
+from backend.llm import achat, achat_json
 
-等价于 `embed([text])[0]`。
-
-#### 2.3 `is_ready()` / `get_model_info()` — 状态检查
-
-```python
-def is_ready() -> bool               # 模型是否加载成功
-def get_model_info() -> dict         # {"configured_model": "...", "active_model": "...", "ready": True/False}
+# 仅 async def 路由用，def 路由直接用 chat()
+text = await achat(system, user, temperature=0.3, max_tokens=1600)
+obj  = await achat_json(system, user, temperature=0.2)
 ```
 
 ---
 
-## 三、向量库 (`backend/vectorstore.py`)
+## 二、`backend/embeddings.py` — 本地中文嵌入
 
-### 供 P5（main 全局实例）、P4（ingest 写入）、P3（tutor RAG） 使用
+### 2.1 `embed()` — 批量文本→向量
 
 ```python
-from backend.vectorstore import VectorStore, retrieve_context
+from backend.embeddings import embed
+
+vectors: list[list[float]] = embed(texts: list[str])
 ```
 
-#### 3.1 `VectorStore` 类 — 核心
+| 输入 | 输出 |
+|------|------|
+| `["文本1", "文本2"]` | `[[0.12,-0.34,...], [0.56,0.78,...]]` 各 512 维 |
+| `[]` | `[]` |
+| `["", "文本"]` | `[[0.0]*512, [0.12,-0.34,...]]`（空字符串零向量占位） |
+
+**模型策略**：
+- 优先用 `.env` 配置的模型
+- 不可用 → 自动降级 `BAAI/bge-small-zh-v1.5`（首跑自动下载 ~90MB）
+- 再失败 → 抛 `RuntimeError`
+
+### 2.2 `embed_one()` — 单个文本→向量
 
 ```python
+from backend.embeddings import embed_one
+
+vec: list[float] = embed_one("单个文本")  # 等价于 embed([text])[0]
+```
+
+### 2.3 `is_ready()` / `get_model_info()` — 状态检查
+
+```python
+from backend.embeddings import is_ready, get_model_info
+
+is_ready()        # → True/False
+get_model_info()  # → {"configured_model":"...","active_model":"...","ready":True}
+```
+
+---
+
+## 三、`backend/vectorstore.py` — 向量库
+
+### 3.1 `VectorStore` — 类完整签名
+
+```python
+from backend.vectorstore import VectorStore
+
 class VectorStore:
-    # --- 创建/加载 ---
-    def __init__(self)                                  # 空库
+    # 创建 / 加载
+    def __init__(self) -> None
     @classmethod
-    def load(cls, path) -> VectorStore                  # 从磁盘加载（文件不存在返回空库）
+    def load(cls, path: str | Path) -> "VectorStore"
 
-    # --- 写入 ---
-    def add(self, items: list[dict], vectors: list[list[float]])
-        # items: [{"text": "文本", "source": "来源", "meta": "{}"}, ...]
-        # vectors: 对应嵌入向量，数量必须与 items 一致
+    # 写入（线程安全）
+    def add(self, items: list[dict], vectors: list[list[float]]) -> None
+        # items 格式: [{"text": str, "source": str, "meta": str}, ...]
+        # 要求: len(items) == len(vectors)，否则抛 ValueError
 
-    # --- 检索 ---
+    # 检索（线程安全）
     def search(self, query_vec: list[float], top_k: int = 5) -> list[dict]
-        # 返回: [{"id": 0, "text": "...", "source": "...", "score": 0.95}, ...]
+        # 返回: [{"id":0, "text":"...", "source":"...", "meta":"...", "score":0.95}, ...]
+        # 空库返回 []
 
     def query(self, text: str, top_k: int = 5) -> list[dict]
-        # 便利方法：输入自然语言文本，自动嵌入+检索
+        # 等价于 embed_one(text) → search(vec, top_k)
 
-    # --- 持久化 ---
-    def save(self, path)                               # 原子写入（不会损坏已有文件）
+    # 持久化（原子写入）
+    def save(self, path: str | Path) -> None
 
-    # --- 属性 ---
-    count: int                                         # 文档数量
-    is_empty: bool                                     # 是否为空
+    # 属性
+    count: int       # 文档数
+    is_empty: bool   # 是否为空
 ```
 
-#### 3.2 `retrieve_context()` — RAG 检索函数（供 P3 tutor）
+### 3.2 `retrieve_context()` — RAG 一步到位
 
-```python
-def retrieve_context(store: VectorStore, query: str, top_k: int = 5) -> str
-```
-
-- 一次调用完成：嵌入 query → 检索 top_k → 拼成带出处的上下文字符串
-- 空库返回 `"（知识库暂无相关内容）"`
-
-**使用示例（P3 tutor.py）**：
 ```python
 from backend.vectorstore import retrieve_context
 
-context = retrieve_context(store, "什么是幂等设计", top_k=4)
-# context = "[来源: doc1.txt]\n幂等设计是指...\n\n[来源: doc2.txt]\n..."
+context: str = retrieve_context(store: VectorStore, query: str, top_k: int = 5)
 ```
 
-#### 3.3 全局实例获取
+**返回值格式**：
+```
+[来源: doc1.md]
+幂等设计是指在分布式系统中...
 
-`main.py` 中已提供全局实例（P5 负责装配，其他人不用管）：
+[来源: doc2.md]
+实现幂等的常见方案有...
+```
+
+空库时返回：`"（知识库暂无相关内容）"`
+
+### 3.3 如何获取 `store` 实例
+
+**P3/P4 的 Agent 函数**：`store` 由调用方（main.py 的路由）传入，函数签名里接收即可：
 
 ```python
-# main.py 中（不由你写，只是告诉 P5 怎么装配）：
-from backend.vectorstore import VectorStore
-from backend.config import settings
+# tutor.py 已有的写法（不用改）：
+def ask(apprentice_id: int, kb_id: int, question: str, store: VectorStore) -> dict:
+    context = retrieve_context(store, question, top_k=4)
+    ...
 
-_store: VectorStore = None
+# ingest.py 已有的写法（不用改）：
+def ingest_local_path(master_id: int, kb_id: int, path_str: str, store: VectorStore) -> dict:
+    vectors = embed([c["text"] for c in chunks])
+    store.add(chunks, vectors)
+    store.save(settings.STORE_PATH)
+    ...
+```
 
-def get_store() -> VectorStore:
-    global _store
-    if _store is None:
-        _store = VectorStore.load(settings.STORE_PATH)
-    return _store
+### 3.4 ⚠️ 常见错误
+
+```python
+# ❌ 错误：直接把 query 文本传给 search()
+store.search("什么是幂等", top_k=5)  # search 需要向量，不是文本！
+
+# ✅ 正确：用 query()（自动嵌入）
+store.query("什么是幂等", top_k=5)
+
+# ✅ 正确：手动嵌入
+vec = embed_one("什么是幂等")
+store.search(vec, top_k=5)
 ```
 
 ---
 
-## 四、知识库自净化 (`backend/self_purifier.py`)
+## 四、`backend/self_purifier.py` — 知识库自净化
 
-### 供 P5（main.py 管理员 API）调用
-
-```python
-from backend.self_purifier import run_purification, get_purification_report, get_purification_stats
-```
-
-#### 4.1 三个模块级函数
+### 仅 P5（main.py）调用，其他人不需要
 
 ```python
-def run_purification(kb_id: int = None) -> dict
-    # 运行一次完整净化，返回报告
-    # 异常时不抛错，返回 {"success": False, "message": "..."}
-
-def get_purification_report() -> dict
-    # 获取最近一次净化报告
-    # 无记录时: {"success": True, "message": "暂无净化记录", "report": None}
-
-def get_purification_stats() -> dict
-    # 获取当前知识库健康统计
-    # {"success": True, "total_chunks": N, "degraded_chunks": N, "health_pct": 98.5}
-```
-
-#### 4.2 对应的 API 端点（P5 在 main.py 中装配）
-
-| 端点 | 调用函数 | 权限 |
-|------|----------|------|
-| `POST /api/admin/purify` | `run_purification(kb_id)` | admin |
-| `GET /api/admin/purify/report` | `get_purification_report()` | admin |
-| `GET /api/admin/purify/stats` | `get_purification_stats()` | admin |
-
----
-
-## 五、各团队快速参考
-
-### P1（后端核心：db/auth/schemas/config）
-
-**不需要直接调用 P2**。但 config.py 中的 LLM/Embedding 配置会被 P2 读取：
-- `settings.LLM_API_KEY` → 控制是否进入演示模式
-- `settings.LLM_BASE_URL` / `settings.LLM_MODEL` → LLM 服务地址
-- `settings.EMBEDDING_MODEL` → 嵌入模型名（默认 `jinaai/jina-embeddings-v2-small-zh`，如不可用自动降级）
-
-### P3（智能体：assessor/tutor/planner/reviewer/refiner）
-
-```python
-# 每个 Agent 需要的 import：
-from backend.llm import chat, chat_json, use_mock  # 调 LLM
-# 仅 tutor.py 额外需要：
-from backend.vectorstore import retrieve_context    # RAG 检索
-```
-
-不需要直接调 `embeddings.py` 或 `vectorstore.VectorStore`。
-
-### P4（资料摄取 + PDF：ingest/pdf_gen）
-
-```python
-# ingest.py:
-from backend.embeddings import embed                 # 批量嵌入文档块
-from backend.vectorstore import VectorStore          # store.add(chunks, vectors)
-
-# pdf_gen.py:
-from backend.llm import chat, use_mock               # 生成讲义内容
-from backend.vectorstore import retrieve_context     # 获取参考上下文
-```
-
-### P5（API 路由 + 前端：main/index.html）
-
-```python
-# main.py 需要：
-from backend.vectorstore import VectorStore          # VectorStore.load(path)
 from backend.self_purifier import (
-    run_purification,                                # POST /api/admin/purify
-    get_purification_report,                         # GET  /api/admin/purify/report
-    get_purification_stats,                          # GET  /api/admin/purify/stats
+    run_purification,         # def(kb_id: int = None) -> dict
+    get_purification_report,  # def() -> dict
+    get_purification_stats,   # def() -> dict
 )
 ```
 
+`main.py` 中已有的装配方式（P5 照搬即可）：
+
+```python
+@app.post("/api/admin/purify")
+def api_run_purification(data: dict = None, user: dict = Depends(auth_user)):
+    if not require_admin(user):
+        raise HTTPException(status_code=403, detail="仅管理员可操作")
+    from backend.self_purifier import run_purification
+    kb_id = data.get("kb_id") if data else None
+    report = run_purification(kb_id)
+    return {"success": True, "report": report}
+
+@app.get("/api/admin/purify/report")
+def api_purification_report(user: dict = Depends(auth_user)):
+    from backend.self_purifier import get_purification_report
+    return get_purification_report()
+
+@app.get("/api/admin/purify/stats")
+def api_purification_stats(user: dict = Depends(auth_user)):
+    from backend.self_purifier import get_purification_stats
+    return get_purification_stats()
+```
+
 ---
 
-## 六、常见问题
+## 五、按团队分发的 Import 清单
 
-**Q: 没有配置 API Key 怎么办？**
-A: P2 自动进入演示模式，`chat()` 返回内置示例回答，全流程可用。
+### P3 — 智能体开发（assessor / tutor / planner / reviewer / refiner）
 
-**Q: 嵌入模型下载太慢？**
-A: 首跑自动下载约 90MB，后续缓存。如需换模型，在 `.env` 设 `EMBEDDING_MODEL=BAAI/bge-small-zh-v1.5`。
+```python
+# ===== 每个 Agent 的标准头部 =====
+from backend.llm import chat, chat_json, use_mock
+from backend.db import get_conn         # P1 提供
+# ===== 仅 tutor.py 额外需要 =====
+from backend.vectorstore import retrieve_context
+```
 
-**Q: 向量库文件损坏了？**
-A: `VectorStore.load()` 自动检测并返回空库（不抛异常），下次 `save()` 会覆盖损坏文件。
+**你不需要** `import embeddings` 或 `import VectorStore`。
 
-**Q: `chat()` 是同步的，会阻塞吗？**
-A: P2 同时提供了 `achat()` / `achat_json()` 异步版（通过 `asyncio.to_thread`）。如果你的路由是 `async def`，用 `await achat(...)`；如果是 `def`，直接用 `chat()`。
+**store 对象**由 main.py 的路由传给你的函数，声明参数 `store: VectorStore` 接收即可。
+
+### P4 — 资料摄取 & PDF（ingest.py / pdf_gen.py）
+
+```python
+# ===== ingest.py =====
+from backend.embeddings import embed
+from backend.vectorstore import VectorStore
+from backend.db import get_conn              # P1 提供
+from backend.config import settings          # P1 提供
+
+# ===== pdf_gen.py =====
+from backend.llm import chat, use_mock
+from backend.vectorstore import retrieve_context
+```
+
+### P5 — API 路由 & 前端（main.py）
+
+```python
+from backend.vectorstore import VectorStore
+from backend.self_purifier import (
+    run_purification,
+    get_purification_report,
+    get_purification_stats,
+)
+```
+
+### P1 — 数据库 & 认证（db / auth / schemas / config）
+
+不需要 import P2 的任何东西。只需确保 `.env` / `config.py` 里的配置项存在即可（见第七章）。
+
+---
+
+## 六、演示模式（无 Key 兜底）— P3 必读
+
+没配 `LLM_API_KEY` 时，`chat()` 不进真实大模型，按 `user` 参数的关键词返回内置示例。
+
+**当前覆盖范围（`backend/llm.py` → `_mock_chat()`）**：
+
+| 你的 Agent | user 里包含 | 返回格式 |
+|-----------|------------|---------|
+| Refiner 精炼 | "知识图谱" / "课程大纲" / "抽取" | `{"project_summary":"...", "knowledge_points":[...]}` |
+| Planner 计划 | "学习路径" / "培养计划" | 纯文本：4 周学习路径 |
+| Assessor/Reviewer | "测验" / "题目" / "出题" | `[{"question":"...", "type":"简答", "answer_key":"..."}]` |
+| Tutor / 其他 | 以上都不匹配 | `（演示模式）我是你的 AI 导师...` |
+
+**如果你新增了 Agent 场景**（比如 user 里有新的关键词），来 P2 这加一个 `if` 分支：
+```python
+# 在 _mock_chat() 里加：
+if "你的关键词" in user:
+    return json.dumps({...})  # 或 return "纯文本"
+```
+
+---
+
+## 七、配置项参考（P1 维护，P2 读取）
+
+`.env` 或 `config.py` 中的这些配置会影响 P2 行为：
+
+| 配置项 | 默认值 | P2 读取位置 | 说明 |
+|--------|--------|-----------|------|
+| `LLM_API_KEY` | `""` | `llm.py` | 为空 → 演示模式 |
+| `LLM_BASE_URL` | `https://api.deepseek.com/v1` | `llm.py` | OpenAI 兼容地址 |
+| `LLM_MODEL` | `deepseek-chat` | `llm.py` | 模型名 |
+| `EMBEDDING_MODEL` | `jinaai/jina-embeddings-v2-small-zh` | `embeddings.py` | 不可用时自动降级 `BAAI/bge-small-zh-v1.5` |
+| `MOCK_MODE` | `auto` | `llm.py` | `true`=强开演示 `false`=强制真实 `auto`=自动检测 |
+| `STORE_PATH` | `backend/data/vectorstore.pkl` | `vectorstore.py` | 向量库持久化路径 |
+
+---
+
+## 八、各团队自检清单
+
+改完代码后跑一遍，确认对接没问题：
+
+```bash
+# P2 基础健康检查（全部团队通用）
+python -c "
+from backend.llm import chat, chat_json, use_mock, check_llm_ready
+from backend.embeddings import embed, embed_one, is_ready
+from backend.vectorstore import VectorStore, retrieve_context
+
+# LLM 能调
+print('LLM:', chat('你是助手','你好')[:30])
+# 嵌入能用
+print('Embed:', len(embed_one('测试')) == 512)
+# 向量库能读写
+s = VectorStore()
+s.add([{'text':'hi','source':'t.txt','meta':'{}'}], [embed_one('hi')])
+print('Search:', len(s.query('hi')) > 0)
+print('ALL OK')
+"
+```
+
+- [ ] 上述命令不报错
+- [ ] 无 `.env` 时启动不崩
+- [ ] 自己的 Agent 在演示模式下有合理返回（不白屏不报错）
+- [ ] 自己的 Agent 在真实 Key 下正常返回
