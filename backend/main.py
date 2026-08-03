@@ -18,8 +18,6 @@ from backend.schemas import (LoginReq, RegisterReq, CreateApprenticeReq, IngestP
                              PlanGenerateReq, AssessmentAnswerReq, ChatReq, CompanyPostReq, AssignMasterReq,
                              PasswordResetRequestReq, PasswordResetReq)
 
-                             PlanGenerateReq, AssessmentAnswerReq, ChatReq, CompanyPostReq, AssignMasterReq)
-
 from backend.vectorstore import VectorStore
 from backend.ingest import ingest_local_path, ingest_urls, get_or_create_kb
 from backend.agents.refiner import refine
@@ -635,25 +633,6 @@ def api_submit_quiz(data: dict, user: dict = Depends(auth_user)):
         "ai_score": ai_score,
         "message": "检测已提交，AI初评完成，等待师傅终评"
     }
- conn = get_conn()
-    item = conn.execute("SELECT pi.*, p.apprentice_id FROM plan_items pi JOIN plans p ON pi.plan_id=p.id WHERE pi.id=? AND p.apprentice_id=?",
-                        (data["plan_item_id"], user["user_id"])).fetchone()
-    if not item:
-        return {"success": False, "message": "无此学习任务"}
-    # attempt递增
-    last = conn.execute("SELECT MAX(attempt) as m FROM quizzes WHERE apprentice_id=? AND plan_item_id=?",
-                        (user["user_id"], data["plan_item_id"])).fetchone()
-    attempt = (last["m"] or 0) + 1
-    # AI评分（简化：根据答案长度打分；实际应调LLM）
-    answer = data.get("answer", "")
-    ai_score = min(100, max(10, len(answer) * 2 if answer else 0))
-    cur = conn.execute(
-        "INSERT INTO quizzes (apprentice_id, plan_item_id, attempt, answer, ai_score, status) VALUES (?, ?, ?, ?, ?, 'pending_review')",
-        (user["user_id"], data["plan_item_id"], attempt, answer, ai_score))
-    conn.commit()
-    return {"success": True, "quiz_id": cur.lastrowid, "attempt": attempt, "ai_score": ai_score,
-            "message": "检测已提交，AI初评完成，等待师傅终评"}
-
 
 
 @app.get("/api/apprentice/quizzes")

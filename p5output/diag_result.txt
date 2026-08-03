@@ -1,0 +1,9 @@
+QPushButton 数量=4
+  按钮 text='📂 浏览…' visible=True size=130x37 geo=(39,132)
+  按钮 text='开始投喂' visible=True size=112x37 geo=(39,209)
+  按钮 text='抓取并投喂' visible=True size=128x39 geo=(39,206)
+  按钮 text='加载示例知识库' visible=True size=164x43 geo=(39,83)
+QGroupBox 数量=3
+  group title='📁 本地文件夹投喂' visible=True
+  group title='🌐 博客 URL 投喂' visible=True
+  group title='🎯 快速演示' visible=True

@@ -3,7 +3,29 @@
 页面构建逻辑分散在各角色 Mixin（ui/master.py、ui/apprentice.py、ui/admin.py、
 ui/social.py、ui/notify.py、ui/progress.py），本文件只负责装配。
 """
+import logging
+import os
 import requests
+
+_log_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                         "p5output", "app_debug.log")
+try:
+    os.makedirs(os.path.dirname(_log_path), exist_ok=True)
+    _fh = logging.FileHandler(_log_path, encoding="utf-8")
+except OSError:
+    _fh = None
+
+logging.basicConfig(
+    level=logging.DEBUG,
+    format="[%(asctime)s][%(levelname)s] %(name)s: %(message)s",
+    datefmt="%H:%M:%S",
+)
+logger = logging.getLogger("ui.main_window")
+if _fh is not None:
+    _fh.setLevel(logging.DEBUG)
+    _fh.setFormatter(logging.Formatter("[%(asctime)s][%(levelname)s] %(name)s: %(message)s",
+                                       datefmt="%H:%M:%S"))
+    logging.getLogger().addHandler(_fh)
 
 from PyQt5.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel,
@@ -212,7 +234,15 @@ class MainWindow(
             "appr_my_plans": self._build_appr_my_plans,
         }
         if pid in builders:
-            builders[pid](layout, container)
+            logger.debug("开始构建页面 pid=%s", pid)
+            try:
+                builders[pid](layout, container)
+                logger.debug("页面构建完成 pid=%s", pid)
+            except Exception as e:
+                logger.exception("构建页面 pid=%s 时抛出异常: %r", pid, e)
+                layout.addWidget(QLabel(f"⚠ 页面构建异常: {e}"))
+        else:
+            logger.warning("无对应构建器 pid=%s", pid)
         layout.addStretch()
 
     @staticmethod

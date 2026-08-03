@@ -342,6 +342,31 @@ def primary_button(text: str) -> QPushButton:
     return b
 
 
+def ingest_button(text: str) -> QPushButton:
+    """投喂动作按钮：白底 + 红框 + 红字（与主按钮红底白字区分）。
+
+    返回 QPushButton（QWidget 子类），样式仅作用于自身，遵守铁律。
+    """
+    b = QPushButton(text)
+    b.setObjectName("btnIngest")
+    b.setCursor(Qt.PointingHandCursor)
+    b.setStyleSheet(
+        "QPushButton#btnIngest{"
+        f"background:{Color.SURFACE};"
+        f"color:{Color.PRIMARY};"
+        f"border:1.5px solid {Color.PRIMARY};"
+        f"border-radius:{Radius.SM}px;"
+        "padding:12px 24px;"
+        "font-size:15px;"
+        "font-weight:600;"
+        "}"
+        f"QPushButton#btnIngest:hover{{background:{Color.PRIMARY_SOFT};}}"
+        f"QPushButton#btnIngest:pressed{{border-color:{Color.PRIMARY_HOVER};color:{Color.PRIMARY_HOVER};}}"
+        "QPushButton#btnIngest:disabled{color:#c8bcbc;border-color:#e0d4d4;}"
+    )
+    return b
+
+
 def success_button(text: str) -> QPushButton:
     b = QPushButton(text)
     b.setObjectName("btnSuccess")

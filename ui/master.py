@@ -1,16 +1,41 @@
 """师傅视图页面：概览、投喂、知识库、徒弟管理、定制计划、批改检测、学情看板。"""
+import logging
+import os
+
+_log_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                         "p5output", "app_debug.log")
+try:
+    os.makedirs(os.path.dirname(_log_path), exist_ok=True)
+    _fh = logging.FileHandler(_log_path, encoding="utf-8")
+except OSError:
+    _fh = None
+
+logging.basicConfig(
+    level=logging.DEBUG,
+    format="[%(asctime)s][%(levelname)s] %(name)s: %(message)s",
+    datefmt="%H:%M:%S",
+)
+logger = logging.getLogger("ui.master")
+if _fh is not None:
+    _fh.setLevel(logging.DEBUG)
+    _fh.setFormatter(logging.Formatter("[%(asctime)s][%(levelname)s] %(name)s: %(message)s",
+                                       datefmt="%H:%M:%S"))
+    logger.addHandler(_fh)
+    logging.getLogger().addHandler(_fh)
+
 from PyQt5.QtWidgets import (
     QVBoxLayout, QHBoxLayout, QGridLayout, QLabel, QLineEdit, QTextEdit,
     QPushButton, QGroupBox, QComboBox, QCheckBox, QProgressBar, QFrame,
     QTableWidget, QTableWidgetItem, QHeaderView, QMessageBox, QDoubleSpinBox,
+    QFileDialog, QAbstractItemView,
 )
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import Qt, QMimeData, QUrl
 
 from ui.api import BASE_URL
 from ui.theme import (
     Color, card, stat_card, section_label, hint_label, loading_label,
     empty_label, primary_button, success_button, secondary_button, badge,
-    apply_shadow,
+    apply_shadow, ingest_button,
 )
 
 
@@ -59,16 +84,36 @@ class MasterPagesMixin:
 
     # ==================== 投喂资料 ====================
     def _build_master_ingest(self, layout, container):
+        logger.debug("=== _build_master_ingest 开始构建投喂资料页 ===")
         g1 = QGroupBox("📁 本地文件夹投喂")
         g1l = QVBoxLayout(g1)
         g1l.addWidget(hint_label("输入包含 md / txt / pdf / docx / 代码 的文件夹路径"))
-        path_input = QLineEdit()
-        path_input.setPlaceholderText(r"例如: C:\Users\TS\Desktop\入职学习")
+        path_input = PathDropLineEdit()
+        path_input.setPlaceholderText(r"例如: C:\Users\TS\Desktop\入职学习  （可拖拽文件夹/文件到此，或点浏览）")
         g1l.addWidget(path_input)
+        row1 = QHBoxLayout()
+        browse_btn = secondary_button("📂 浏览…")
+        row1.addWidget(browse_btn)
+        row1.addStretch()
+        g1l.addLayout(row1)
         msg1 = hint_label("")
         g1l.addWidget(msg1)
-        btn1 = primary_button("开始投喂")
+        btn1 = ingest_button("开始投喂")
+        logger.debug("已创建按钮 btn1=[开始投喂] object=%r", btn1)
         g1l.addWidget(btn1, alignment=Qt.AlignLeft)
+
+        def browse():
+            # 支持多选文件与目录混合选择（Windows 下 QFileDialog 原生对话框支持）
+            dlg = QFileDialog(container)
+            dlg.setWindowTitle("选择文件夹或文件")
+            dlg.setFileMode(QFileDialog.ExistingFiles)
+            dlg.setOption(QFileDialog.DontUseNativeDialog, False)
+            dlg.setOption(QFileDialog.ShowDirsOnly, False)
+            # 通过 name filter 允许任意类型；目录与文件均可见可选
+            if dlg.exec_() == QFileDialog.Accepted:
+                paths = dlg.selectedFiles()
+                if paths:
+                    path_input.setText("; ".join(paths))
 
         def ingest_path():
             p = path_input.text().strip()
@@ -79,6 +124,7 @@ class MasterPagesMixin:
             self._api_call("POST", f"{BASE_URL}/api/master/ingest", {"path": p},
                            callback=lambda r: msg1.setText(
                                f'{"✅" if r.get("success") else "❌"} {r.get("message", "")}'))
+        browse_btn.clicked.connect(browse)
         btn1.clicked.connect(ingest_path)
         layout.addWidget(g1)
 
@@ -91,7 +137,8 @@ class MasterPagesMixin:
         g2l.addWidget(url_input)
         msg2 = hint_label("")
         g2l.addWidget(msg2)
-        btn2 = primary_button("抓取并投喂")
+        btn2 = ingest_button("抓取并投喂")
+        logger.debug("已创建按钮 btn2=[抓取并投喂] object=%r", btn2)
         g2l.addWidget(btn2, alignment=Qt.AlignLeft)
 
         def ingest_url():
@@ -115,6 +162,7 @@ class MasterPagesMixin:
             callback=lambda r: QMessageBox.information(self, "结果", r.get("message", ""))))
         g3l.addWidget(btn3, alignment=Qt.AlignLeft)
         layout.addWidget(g3)
+        logger.debug("=== _build_master_ingest 完成，g1/g2/g3 均已加入 layout ===")
 
     # ==================== 知识库 ====================
     def _build_master_knowledge(self, layout, container):
@@ -456,6 +504,49 @@ class MasterPagesMixin:
                 w.deleteLater()
             elif item.layout():
                 MasterPagesMixin._clear_layout(item.layout())
+
+
+class PathDropLineEdit(QLineEdit):
+    """支持将本地文件夹 / 文件拖拽放入的输入框。
+
+    拖入时高亮边框；drop 时把 mimeData 中的本地路径以 "; " 拼接回填，
+    与「📂 浏览…」按钮的回填格式一致，最终统一交给 /api/master/ingest。
+    """
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setAcceptDrops(True)
+        self.setStyleSheet(
+            "QLineEdit{border:1.5px solid #e6d2d2;border-radius:10px;padding:12px 14px;"
+            "font-size:15px;background:#ffffff;color:#1f1a1a;}"
+            "QLineEdit[focus]{border-color:#dc2626;}"
+            "QLineEdit[dragOver=true]{border:2px solid #dc2626;background:#fef2f2;}")
+
+    def dragEnterEvent(self, event):
+        if event.mimeData().hasUrls():
+            event.acceptProposedAction()
+            self.setProperty("dragOver", True)
+            self.style().polish(self)
+        else:
+            event.ignore()
+
+    def dragLeaveEvent(self, event):
+        self.setProperty("dragOver", False)
+        self.style().polish(self)
+        super().dragLeaveEvent(event)
+
+    def dropEvent(self, event):
+        urls = event.mimeData().urls()
+        if urls:
+            paths = [u.toLocalFile() for u in urls if u.isLocalFile()]
+            if paths:
+                existing = self.text().strip()
+                merged = "; ".join([p for p in (existing.split("; ") if existing else []) + paths if p])
+                self.setText(merged)
+            event.acceptProposedAction()
+        self.setProperty("dragOver", False)
+        self.style().polish(self)
+        super().dropEvent(event)
 
 
 def _mastery_bar(m: dict) -> QVBoxLayout:
