@@ -1,0 +1,16 @@
+# TS-Force AI 创新大赛 · 智能人才培养导师系统 依赖
+# 安装：pip install -r requirements.txt
+fastapi>=0.110
+uvicorn[standard]>=0.27
+python-dotenv>=1.0
+openai>=1.40
+fastembed>=0.3
+pypdf>=4.0
+python-docx>=1.1
+numpy>=1.24
+reportlab>=4.0
+fpdf2>=2.7
+trafilatura>=1.12
+beautifulsoup4>=4.12
+requests>=2.31
+PyQt5>=5.15
