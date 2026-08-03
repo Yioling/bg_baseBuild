@@ -45,3 +45,6 @@ backend/data/
 
 # SDD scratch
 .superpowers/
+
+# 日志文件
+*.log
