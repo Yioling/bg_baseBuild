@@ -223,6 +223,49 @@ def get_assessment_result(assessment_id: int) -> dict:
     }
 
 
+QUIZ_GRADE_SYSTEM = """你是一位严谨的阅卷官，依据课程资料对徒弟的作答评分。
+仅输出 JSON：{"score": 0-100 的整数, "feedback": "评语，含正确答案与解析"}。
+简答题按关键点命中比例给分；无 Key/无法判断时给出合理分并说明。"""
+
+
+def grade_quiz_answer(plan_item_id: int, answer: str, context: str = None) -> dict:
+    """对今日任务检测的徒弟作答做真实 LLM 初评（P0）。
+    返回: {"score": int(0-100), "feedback": str}
+    - context 为 None 时，内部据 plan_item_id 取 courses.content 作为评分上下文
+    - 无 Key / LLM 失败 / 解析失败 → 兜底评分（基于答案长度）并说明
+    """
+    # 取评分上下文
+    if context is None:
+        conn = get_conn()
+        row = conn.execute(
+            "SELECT c.content FROM plan_items pi JOIN courses c ON pi.course_id=c.id WHERE pi.id=?",
+            (plan_item_id,),
+        ).fetchone()
+        context = (row["content"] or "") if row else ""
+
+    # 演示模式兜底
+    if use_mock():
+        score = min(100, max(20, len(answer or "") * 3)) if answer else 20
+        return {
+            "score": score,
+            "feedback": "（演示模式）已根据作答长度给出初评；配置真实 LLM 后将以语义理解评分。",
+        }
+
+    # 真实 LLM 评分
+    prompt = f"课程资料：\n{context}\n\n徒弟作答：\n{answer}\n\n请严格按系统指令仅返回评分 JSON。"
+    result = chat_json(QUIZ_GRADE_SYSTEM, prompt)
+
+    # 解析结果
+    if not isinstance(result, dict) or "score" not in result:
+        score = min(100, max(20, len(answer or "") * 3)) if answer else 20
+        return {"score": score, "feedback": "（LLM 解析失败，已兜底评分）"}
+    try:
+        return {"score": int(result.get("score", 0)), "feedback": str(result.get("feedback", ""))}
+    except (TypeError, ValueError):
+        score = min(100, max(20, len(answer or "") * 3)) if answer else 20
+        return {"score": score, "feedback": "（分数解析失败，已兜底评分）"}
+
+
 def get_mistakes(apprentice_id: int) -> dict:
     """获取徒弟的错题本。"""
     conn = get_conn()
