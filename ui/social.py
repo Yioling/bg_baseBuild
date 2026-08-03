@@ -59,7 +59,7 @@ class SocialPagesMixin:
 
                 head = QHBoxLayout()
                 author = QLabel(p.get("author_name", ""))
-                author.setStyleSheet(f"font-weight:700;color:{Color.TEXT};font-size:15px;")
+                author.setStyleSheet(f"font-weight:700;color:{Color.TEXT};font-size:20px;")
                 head.addWidget(author)
                 role = p.get("author_role", "")
                 if role:
@@ -67,13 +67,13 @@ class SocialPagesMixin:
                                          Color.PRIMARY, Color.PRIMARY_SOFT))
                 head.addStretch()
                 t = QLabel(str(p.get("created_at", ""))[:19])
-                t.setStyleSheet(f"color:{Color.TEXT_MUTED};font-size:13px;")
+                t.setStyleSheet(f"color:{Color.TEXT_MUTED};font-size:18px;")
                 head.addWidget(t)
                 pl.addLayout(head)
 
                 ct = QLabel(p.get("content", ""))
                 ct.setWordWrap(True)
-                ct.setStyleSheet(f"color:{Color.TEXT};font-size:15.5px;padding:2px 0;")
+                ct.setStyleSheet(f"color:{Color.TEXT};font-size:20.5px;padding:2px 0;")
                 pl.addWidget(ct)
 
                 actions = QHBoxLayout()
@@ -132,11 +132,11 @@ class SocialPagesMixin:
                 cl = QVBoxLayout(cf)
                 cl.setSpacing(2)
                 head = QLabel(f'{c.get("author_name") or c.get("author_id", "")}')
-                head.setStyleSheet(f"font-weight:700;color:{Color.TEXT};font-size:14px;")
+                head.setStyleSheet(f"font-weight:700;color:{Color.TEXT};font-size:19px;")
                 cl.addWidget(head)
                 body = QLabel(c.get("content", ""))
                 body.setWordWrap(True)
-                body.setStyleSheet(f"color:{Color.TEXT};font-size:14.5px;")
+                body.setStyleSheet(f"color:{Color.TEXT};font-size:19.5px;")
                 cl.addWidget(body)
                 c_list.insertWidget(c_list.count() - 1, cf)
 

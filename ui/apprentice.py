@@ -88,7 +88,7 @@ class ApprenticePagesMixin:
         questions = self._assess_data["questions"]
         if self._assess_idx >= len(questions):
             done = QLabel("🎉 摸底考试完成！")
-            done.setStyleSheet(f"font-size:20px;color:{Color.SUCCESS};font-weight:800;")
+            done.setStyleSheet(f"font-size:25px;color:{Color.SUCCESS};font-weight:800;")
             area.addWidget(done)
             self._api_call(
                 "GET",
@@ -108,7 +108,7 @@ class ApprenticePagesMixin:
         ql.setSpacing(8)
         head = QHBoxLayout()
         idx = QLabel(f"题目 {self._assess_idx + 1} / {len(questions)}")
-        idx.setStyleSheet(f"color:{Color.TEXT_SUB};font-size:14px;font-weight:600;")
+        idx.setStyleSheet(f"color:{Color.TEXT_SUB};font-size:19px;font-weight:600;")
         head.addWidget(idx)
         head.addWidget(badge(q.get("difficulty", ""), Color.WARNING, Color.WARNING_SOFT))
         head.addWidget(badge(q.get("qtype", ""), Color.INFO, "#e0f2fe"))
@@ -116,7 +116,7 @@ class ApprenticePagesMixin:
         ql.addLayout(head)
 
         qt = QLabel(q.get("question", ""))
-        qt.setStyleSheet(f"font-size:17px;font-weight:700;color:{Color.TEXT};")
+        qt.setStyleSheet(f"font-size:22px;font-weight:700;color:{Color.TEXT};")
         qt.setWordWrap(True)
         ql.addWidget(qt)
 
@@ -172,7 +172,7 @@ class ApprenticePagesMixin:
         fb.setStyleSheet(
             f'background:{Color.SUCCESS_SOFT if ok else Color.DANGER_SOFT};'
             f'color:{"#065f46" if ok else "#991b1b"};'
-            f'padding:12px;border-radius:8px;font-size:15px;')
+            f'padding:12px;border-radius:8px;font-size:25px;')
         fb.setWordWrap(True)
         self._assess_area.addWidget(fb)
         self._assess_idx += 1
@@ -209,7 +209,7 @@ class ApprenticePagesMixin:
             dl.setSpacing(8)
             hdr = QHBoxLayout()
             plan_label = QLabel(f'📖 今日学习 (Day {today.get("day_index", "")})')
-            plan_label.setStyleSheet(f"font-size:18px;font-weight:800;color:{Color.TEXT};")
+            plan_label.setStyleSheet(f"font-size:23px;font-weight:800;color:{Color.TEXT};")
             hdr.addWidget(plan_label)
             hdr.addStretch()
             pdf_btn = success_button("📄 下载 PDF 讲义到桌面")
@@ -225,16 +225,16 @@ class ApprenticePagesMixin:
             for t in tasks:
                 row = QHBoxLayout()
                 tl = QLabel(f'[{t.get("task_type", "")}] {t.get("title", "")}')
-                tl.setStyleSheet(f"color:{Color.TEXT};font-size:15px;")
+                tl.setStyleSheet(f"color:{Color.TEXT};font-size:25px;")
                 row.addWidget(tl)
                 row.addStretch()
                 dur = QLabel(f'{t.get("duration_min", 0)} 分钟')
-                dur.setStyleSheet(f"color:{Color.TEXT_SUB};font-size:14px;")
+                dur.setStyleSheet(f"color:{Color.TEXT_SUB};font-size:19px;")
                 row.addWidget(dur)
                 dl.addLayout(row)
 
             total = QLabel(f'总时长: {sum(t.get("duration_min", 0) for t in tasks)} 分钟')
-            total.setStyleSheet(f"color:{Color.TEXT_SUB};font-size:14px;font-weight:600;")
+            total.setStyleSheet(f"color:{Color.TEXT_SUB};font-size:19px;font-weight:600;")
             dl.addWidget(total)
             layout.addWidget(df)
 
@@ -310,7 +310,7 @@ class ApprenticePagesMixin:
         questions = self._review_data["questions"]
         if self._review_idx >= len(questions):
             done = QLabel("🎉 复习完成！")
-            done.setStyleSheet(f"font-size:18px;color:{Color.SUCCESS};font-weight:800;")
+            done.setStyleSheet(f"font-size:23px;color:{Color.SUCCESS};font-weight:800;")
             area.addWidget(done)
             reset_btn = secondary_button("再次复习")
             reset_btn.clicked.connect(lambda: (
@@ -325,10 +325,10 @@ class ApprenticePagesMixin:
         ql = QVBoxLayout(qf)
         ql.setSpacing(8)
         idx_l = QLabel(f"题目 {self._review_idx + 1} / {len(questions)}")
-        idx_l.setStyleSheet(f"color:{Color.TEXT_SUB};font-size:14px;font-weight:600;")
+        idx_l.setStyleSheet(f"color:{Color.TEXT_SUB};font-size:19px;font-weight:600;")
         ql.addWidget(idx_l)
         q_l = QLabel(q.get("question", ""))
-        q_l.setStyleSheet(f"font-size:16px;font-weight:700;color:{Color.TEXT};")
+        q_l.setStyleSheet(f"font-size:21px;font-weight:700;color:{Color.TEXT};")
         q_l.setWordWrap(True)
         ql.addWidget(q_l)
 
@@ -364,7 +364,7 @@ class ApprenticePagesMixin:
         fb.setStyleSheet(
             f'background:{Color.SUCCESS_SOFT if ok else Color.DANGER_SOFT};'
             f'color:{"#065f46" if ok else "#991b1b"};'
-            f'padding:10px;border-radius:8px;font-size:15px;')
+            f'padding:10px;border-radius:8px;font-size:25px;')
         fb.setWordWrap(True)
         self._review_area.addWidget(fb)
         self._review_idx += 1
@@ -382,7 +382,7 @@ class ApprenticePagesMixin:
             all_m = res.get("assess_mistakes", []) + res.get("review_mistakes", [])
             if not res.get("success") or not all_m:
                 lbl = QLabel("🎉 太棒了！目前没有错题记录。")
-                lbl.setStyleSheet(f"color:{Color.SUCCESS};font-size:16px;font-weight:600;padding:20px;")
+                lbl.setStyleSheet(f"color:{Color.SUCCESS};font-size:21px;font-weight:600;padding:20px;")
                 layout.addWidget(lbl)
                 return
             for m in all_m:
@@ -390,7 +390,7 @@ class ApprenticePagesMixin:
                 dl = QVBoxLayout(df)
                 dl.setSpacing(4)
                 ql = QLabel(f'❌ {m.get("question", "")}')
-                ql.setStyleSheet(f"font-weight:700;color:{Color.TEXT};font-size:15px;")
+                ql.setStyleSheet(f"font-weight:700;color:{Color.TEXT};font-size:25px;")
                 ql.setWordWrap(True)
                 dl.addWidget(ql)
                 for text in [
@@ -420,19 +420,19 @@ class ApprenticePagesMixin:
                 row = card(accent=color, padding=10)
                 rl = QHBoxLayout(row)
                 rk = QLabel(f"#{rank}")
-                rk.setStyleSheet(f"font-size:18px;font-weight:800;color:{color};min-width:36px;")
+                rk.setStyleSheet(f"font-size:23px;font-weight:800;color:{color};min-width:36px;")
                 rl.addWidget(rk)
                 is_me = item.get("apprentice_id") == res.get("my_id")
                 name = QLabel(item.get("username", "") + ("  (我)" if is_me else ""))
                 name.setStyleSheet(
-                    f'font-weight:700;color:{Color.PRIMARY if is_me else Color.TEXT};font-size:15px;')
+                    f'font-weight:700;color:{Color.PRIMARY if is_me else Color.TEXT};font-size:25px;')
                 rl.addWidget(name)
                 rl.addStretch()
                 for txt in [f'均分: {item.get("avg_score", 0)}',
                             f'熟练: {item.get("mastery_count", 0)} 维度',
                             f'错题: {item.get("mistake_count", 0)}']:
                     t = QLabel(txt)
-                    t.setStyleSheet(f"color:{Color.TEXT_SUB};font-size:14px;padding:0 6px;")
+                    t.setStyleSheet(f"color:{Color.TEXT_SUB};font-size:19px;padding:0 6px;")
                     rl.addWidget(t)
                 layout.addWidget(row)
 
@@ -454,7 +454,7 @@ class ApprenticePagesMixin:
                 pl.setSpacing(6)
                 head = QHBoxLayout()
                 name = QLabel(f'📋 {p.get("name", "")}')
-                name.setStyleSheet(f"font-size:17px;font-weight:800;color:{Color.TEXT};")
+                name.setStyleSheet(f"font-size:22px;font-weight:800;color:{Color.TEXT};")
                 head.addWidget(name)
                 if p.get("completed_at"):
                     head.addWidget(badge("已完成", Color.SUCCESS, Color.SUCCESS_SOFT))
@@ -463,7 +463,7 @@ class ApprenticePagesMixin:
                 for item in p.get("items", []):
                     row = QHBoxLayout()
                     it = QLabel(f'· {item.get("course_title", "")}  [{item.get("course_type", "")}]')
-                    it.setStyleSheet(f"color:{Color.TEXT};font-size:15px;")
+                    it.setStyleSheet(f"color:{Color.TEXT};font-size:25px;")
                     row.addWidget(it)
                     row.addStretch()
                     quiz_btn = secondary_button("✍ 提交检测")
@@ -490,7 +490,7 @@ class ApprenticePagesMixin:
                 qf = card(padding=10)
                 ql = QHBoxLayout(qf)
                 t = QLabel(f'{q.get("course_title") or "任务"}  · 第{q.get("attempt", 1)}次')
-                t.setStyleSheet(f"font-weight:600;color:{Color.TEXT};font-size:15px;")
+                t.setStyleSheet(f"font-weight:600;color:{Color.TEXT};font-size:25px;")
                 ql.addWidget(t)
                 status = q.get("status", "")
                 passed = status == "passed"
@@ -500,7 +500,7 @@ class ApprenticePagesMixin:
                 ql.addStretch()
                 sc = QLabel(f'AI: {q.get("ai_score", "-")} | 终评: '
                             f'{q.get("master_score") if q.get("master_score") is not None else "—"}')
-                sc.setStyleSheet(f"color:{Color.TEXT_SUB};font-size:14px;")
+                sc.setStyleSheet(f"color:{Color.TEXT_SUB};font-size:19px;")
                 ql.addWidget(sc)
                 layout.addWidget(qf)
 

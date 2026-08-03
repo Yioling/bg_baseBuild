@@ -6,7 +6,7 @@
 """
 from PyQt5.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton,
-    QComboBox, QStackedWidget, QWidget, QFrame,
+    QComboBox, QStackedWidget, QWidget, QFrame, QScrollArea,
 )
 from PyQt5.QtCore import Qt
 
@@ -14,32 +14,32 @@ from ui.api import ApiThread, BASE_URL
 
 _RED_WHITE_QSS = """
 QDialog { background: qlineargradient(x1:0,y1:0,x2:1,y2:1, stop:0 #ffffff, stop:1 #fdecec); }
-QLabel { color: #4b5563; font-size: 14.5px; }
-QLabel#loginTitle { color: #b91c1c; font-size: 28px; font-weight: 800; }
-QLabel#loginSub { color: #9c8a8a; font-size: 14px; }
-QLabel#loginMsg { font-size: 14px; }
+QLabel { color: #4b5563; font-size: 19px; }
+QLabel#loginTitle { color: #b91c1c; font-size: 33px; font-weight: 800; }
+QLabel#loginSub { color: #9c8a8a; font-size: 19px; }
+QLabel#loginMsg { font-size: 19px; }
 QLineEdit, QComboBox {
     background: #ffffff; color: #1f1a1a;
-    border: 1.5px solid #e6d2d2; border-radius: 10px;
-    padding: 12px 14px; font-size: 15px;
+    border: 1.5px solid #e6d2d2; border-radius: 12px;
+    padding: 19px 18px; font-size: 19px;
 }
 QLineEdit:focus, QComboBox:focus { border-color: #dc2626; }
-QComboBox::drop-down { border: none; width: 26px; }
+QComboBox::drop-down { border: none; width: 30px; }
 QComboBox QAbstractItemView {
     background: #ffffff; color: #1f1a1a; border: 1px solid #e6d2d2;
-    font-size: 15px;
+    font-size: 19px;
     selection-background-color: #fef2f2; selection-color: #b91c1c;
 }
 QPushButton#authBtn {
     background: qlineargradient(x1:0,y1:0,x2:1,y2:0, stop:0 #dc2626, stop:1 #ef4444);
-    color: white; border: none; border-radius: 10px;
-    padding: 14px; font-size: 17px; font-weight: 700;
+    color: white; border: none; border-radius: 12px;
+    padding: 16px; font-size: 22px; font-weight: 700;
 }
 QPushButton#authBtn:hover { background: #b91c1c; }
 QPushButton#authBtn:disabled { background: #d8bcbc; }
 QPushButton#tabBtn {
     background: transparent; color: #9c8a8a; border: none;
-    padding: 10px 0; font-size: 16px; font-weight: 600;
+    padding: 12px 0; font-size: 21px; font-weight: 600;
     border-bottom: 3px solid transparent; border-radius: 0;
 }
 QPushButton#tabBtn:checked { color: #b91c1c; border-bottom: 3px solid #dc2626; }
@@ -54,7 +54,7 @@ class LoginDialog(QDialog):
         self.user = None
         self._threads = []
         self.setWindowTitle("薪火 · AI 导师系统 — 登录")
-        self.setFixedSize(540, 720)
+        self.setFixedSize(660, 980)
         self.setStyleSheet(_RED_WHITE_QSS)
         self._init_ui()
         self._load_companies()
@@ -62,8 +62,8 @@ class LoginDialog(QDialog):
     # ---------- UI ----------
     def _init_ui(self):
         root = QVBoxLayout(self)
-        root.setContentsMargins(48, 38, 48, 34)
-        root.setSpacing(14)
+        root.setContentsMargins(72, 54, 72, 46)
+        root.setSpacing(22)
 
         title = QLabel("🔥  薪火 · AI 导师系统")
         title.setObjectName("loginTitle")
@@ -121,7 +121,7 @@ class LoginDialog(QDialog):
         w = QWidget()
         lay = QVBoxLayout(w)
         lay.setContentsMargins(0, 10, 0, 0)
-        lay.setSpacing(10)
+        lay.setSpacing(16)
         lay.addWidget(QLabel("用户名"))
         self.l_uname = QLineEdit()
         self.l_uname.setPlaceholderText("输入用户名")
@@ -139,10 +139,12 @@ class LoginDialog(QDialog):
         w = QWidget()
         lay = QVBoxLayout(w)
         lay.setContentsMargins(0, 10, 0, 0)
-        lay.setSpacing(8)
+        lay.setSpacing(12)
 
         row1 = QHBoxLayout()
+        row1.setSpacing(18)
         col_a = QVBoxLayout()
+        col_a.setSpacing(10)
         col_a.addWidget(QLabel("用户名 *"))
         self.r_uname = QLineEdit()
         self.r_uname.setPlaceholderText("登录用户名")
@@ -158,7 +160,9 @@ class LoginDialog(QDialog):
         lay.addLayout(row1)
 
         row2 = QHBoxLayout()
+        row2.setSpacing(18)
         col_c = QVBoxLayout()
+        col_c.setSpacing(10)
         col_c.addWidget(QLabel("姓名"))
         self.r_name = QLineEdit()
         self.r_name.setPlaceholderText("真实姓名")
@@ -173,7 +177,9 @@ class LoginDialog(QDialog):
         lay.addLayout(row2)
 
         row3 = QHBoxLayout()
+        row3.setSpacing(18)
         col_e = QVBoxLayout()
+        col_e.setSpacing(10)
         col_e.addWidget(QLabel("手机号"))
         self.r_phone = QLineEdit()
         self.r_phone.setPlaceholderText("联系电话")
@@ -188,7 +194,9 @@ class LoginDialog(QDialog):
         lay.addLayout(row3)
 
         row4 = QHBoxLayout()
+        row4.setSpacing(18)
         col_g = QVBoxLayout()
+        col_g.setSpacing(10)
         col_g.addWidget(QLabel("角色 *"))
         self.r_role = QComboBox()
         self.r_role.addItem("师傅", "master")
@@ -205,10 +213,21 @@ class LoginDialog(QDialog):
 
         tip = QLabel("💡 徒弟账号由师傅在系统内创建；注册后需管理员审核通过方可登录。")
         tip.setWordWrap(True)
-        tip.setStyleSheet("color:#9c8a8a;font-size:13px;")
+        tip.setStyleSheet("color:#9c8a8a;font-size:18px;")
         lay.addWidget(tip)
         lay.addStretch()
-        return w
+        return self._wrap_scroll(w)
+
+    def _wrap_scroll(self, inner: QWidget) -> QScrollArea:
+        """将注册表单包进滚动区，窗口高度不足时也不压缩输入框。"""
+        sa = QScrollArea()
+        sa.setWidget(inner)
+        sa.setWidgetResizable(True)
+        sa.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        sa.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        sa.setFrameShape(QFrame.NoFrame)
+        sa.setStyleSheet("QScrollArea{background:transparent;}")
+        return sa
 
     # ---------- 行为 ----------
     def _switch_mode(self, idx: int):
