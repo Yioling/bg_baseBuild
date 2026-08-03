@@ -1004,3 +1004,283 @@ Traceback (most recent call last):
 ImportError: DLL load failed while importing onnxruntime_pybind11_state: 动态链接库(DLL)初始化例程失败。
 [17:08:18][DEBUG] urllib3.connectionpool: http://127.0.0.1:8000 "POST /api/master/ingest HTTP/1.1" 200 199
 [17:08:18][DEBUG] urllib3.connectionpool: http://127.0.0.1:8000 "POST /api/master/ingest HTTP/1.1" 200 199
+[17:16:03][DEBUG] urllib3.connectionpool: Starting new HTTP connection (1): 127.0.0.1:8000
+[17:16:03][DEBUG] urllib3.connectionpool: Starting new HTTP connection (1): 127.0.0.1:8000
+[17:16:03][DEBUG] urllib3.connectionpool: http://127.0.0.1:8000 "GET /api/companies HTTP/1.1" 200 60
+[17:16:03][DEBUG] urllib3.connectionpool: http://127.0.0.1:8000 "GET /api/companies HTTP/1.1" 200 60
+[17:16:33][DEBUG] urllib3.connectionpool: Starting new HTTP connection (1): 127.0.0.1:8000
+[17:16:33][DEBUG] urllib3.connectionpool: Starting new HTTP connection (1): 127.0.0.1:8000
+[17:16:33][DEBUG] urllib3.connectionpool: http://127.0.0.1:8000 "POST /api/login HTTP/1.1" 200 264
+[17:16:33][DEBUG] urllib3.connectionpool: http://127.0.0.1:8000 "POST /api/login HTTP/1.1" 200 264
+[17:16:33][DEBUG] ui.main_window: 开始构建页面 pid=master_overview
+[17:16:33][DEBUG] ui.main_window: 开始构建页面 pid=master_overview
+[17:16:33][DEBUG] ui.main_window: 页面构建完成 pid=master_overview
+[17:16:33][DEBUG] ui.main_window: 页面构建完成 pid=master_overview
+[17:16:33][DEBUG] urllib3.connectionpool: Starting new HTTP connection (1): 127.0.0.1:8000
+[17:16:33][DEBUG] urllib3.connectionpool: Starting new HTTP connection (1): 127.0.0.1:8000
+[17:16:33][DEBUG] urllib3.connectionpool: Starting new HTTP connection (1): 127.0.0.1:8000
+[17:16:33][DEBUG] urllib3.connectionpool: Starting new HTTP connection (1): 127.0.0.1:8000
+[17:16:33][DEBUG] urllib3.connectionpool: http://127.0.0.1:8000 "GET /api/notifications HTTP/1.1" 200 52
+[17:16:33][DEBUG] urllib3.connectionpool: http://127.0.0.1:8000 "GET /api/notifications HTTP/1.1" 200 52
+[17:16:33][DEBUG] urllib3.connectionpool: http://127.0.0.1:8000 "GET /api/master/knowledge HTTP/1.1" 200 42
+[17:16:33][DEBUG] urllib3.connectionpool: http://127.0.0.1:8000 "GET /api/master/knowledge HTTP/1.1" 200 42
+[17:16:33][DEBUG] urllib3.connectionpool: Starting new HTTP connection (1): 127.0.0.1:8000
+[17:16:33][DEBUG] urllib3.connectionpool: Starting new HTTP connection (1): 127.0.0.1:8000
+[17:16:33][DEBUG] urllib3.connectionpool: http://127.0.0.1:8000 "GET /api/master/apprentices HTTP/1.1" 200 120
+[17:16:33][DEBUG] urllib3.connectionpool: http://127.0.0.1:8000 "GET /api/master/apprentices HTTP/1.1" 200 120
+[17:16:36][DEBUG] ui.main_window: 开始构建页面 pid=master_ingest
+[17:16:36][DEBUG] ui.main_window: 开始构建页面 pid=master_ingest
+[17:16:36][DEBUG] ui.master: === _build_master_ingest 开始构建投喂资料页 ===
+[17:16:36][DEBUG] ui.master: === _build_master_ingest 开始构建投喂资料页 ===
+[17:16:36][DEBUG] ui.master: === _build_master_ingest 开始构建投喂资料页 ===
+[17:16:36][DEBUG] ui.master: 已创建按钮 btn1=[开始投喂] object=<PyQt5.QtWidgets.QPushButton object at 0x000001BE871BE600>
+[17:16:36][DEBUG] ui.master: 已创建按钮 btn1=[开始投喂] object=<PyQt5.QtWidgets.QPushButton object at 0x000001BE871BE600>
+[17:16:36][DEBUG] ui.master: 已创建按钮 btn1=[开始投喂] object=<PyQt5.QtWidgets.QPushButton object at 0x000001BE871BE600>
+[17:16:36][DEBUG] ui.master: 已创建按钮 btn2=[抓取并投喂] object=<PyQt5.QtWidgets.QPushButton object at 0x000001BE871BE960>
+[17:16:36][DEBUG] ui.master: 已创建按钮 btn2=[抓取并投喂] object=<PyQt5.QtWidgets.QPushButton object at 0x000001BE871BE960>
+[17:16:36][DEBUG] ui.master: 已创建按钮 btn2=[抓取并投喂] object=<PyQt5.QtWidgets.QPushButton object at 0x000001BE871BE960>
+[17:16:36][DEBUG] ui.master: === _build_master_ingest 完成，g1/g2/g3 均已加入 layout ===
+[17:16:36][DEBUG] ui.master: === _build_master_ingest 完成，g1/g2/g3 均已加入 layout ===
+[17:16:36][DEBUG] ui.master: === _build_master_ingest 完成，g1/g2/g3 均已加入 layout ===
+[17:16:36][DEBUG] ui.main_window: 页面构建完成 pid=master_ingest
+[17:16:36][DEBUG] ui.main_window: 页面构建完成 pid=master_ingest
+[17:16:37][DEBUG] ui.main_window: 开始构建页面 pid=master_knowledge
+[17:16:37][DEBUG] ui.main_window: 开始构建页面 pid=master_knowledge
+[17:16:37][DEBUG] ui.main_window: 页面构建完成 pid=master_knowledge
+[17:16:37][DEBUG] ui.main_window: 页面构建完成 pid=master_knowledge
+[17:16:37][DEBUG] urllib3.connectionpool: Starting new HTTP connection (1): 127.0.0.1:8000
+[17:16:37][DEBUG] urllib3.connectionpool: Starting new HTTP connection (1): 127.0.0.1:8000
+[17:16:37][DEBUG] urllib3.connectionpool: http://127.0.0.1:8000 "GET /api/master/knowledge HTTP/1.1" 200 42
+[17:16:37][DEBUG] urllib3.connectionpool: http://127.0.0.1:8000 "GET /api/master/knowledge HTTP/1.1" 200 42
+[17:16:44][DEBUG] ui.main_window: 开始构建页面 pid=master_apprentices
+[17:16:44][DEBUG] ui.main_window: 开始构建页面 pid=master_apprentices
+[17:16:44][DEBUG] ui.main_window: 页面构建完成 pid=master_apprentices
+[17:16:44][DEBUG] ui.main_window: 页面构建完成 pid=master_apprentices
+[17:16:44][DEBUG] urllib3.connectionpool: Starting new HTTP connection (1): 127.0.0.1:8000
+[17:16:44][DEBUG] urllib3.connectionpool: Starting new HTTP connection (1): 127.0.0.1:8000
+[17:16:44][DEBUG] urllib3.connectionpool: http://127.0.0.1:8000 "GET /api/master/apprentices HTTP/1.1" 200 120
+[17:16:44][DEBUG] urllib3.connectionpool: http://127.0.0.1:8000 "GET /api/master/apprentices HTTP/1.1" 200 120
+[17:16:55][DEBUG] ui.main_window: 开始构建页面 pid=master_plans
+[17:16:55][DEBUG] ui.main_window: 开始构建页面 pid=master_plans
+[17:16:55][DEBUG] ui.main_window: 页面构建完成 pid=master_plans
+[17:16:55][DEBUG] ui.main_window: 页面构建完成 pid=master_plans
+[17:16:55][DEBUG] urllib3.connectionpool: Starting new HTTP connection (1): 127.0.0.1:8000
+[17:16:55][DEBUG] urllib3.connectionpool: Starting new HTTP connection (1): 127.0.0.1:8000
+[17:16:55][DEBUG] urllib3.connectionpool: Starting new HTTP connection (1): 127.0.0.1:8000
+[17:16:55][DEBUG] urllib3.connectionpool: Starting new HTTP connection (1): 127.0.0.1:8000
+[17:16:55][DEBUG] urllib3.connectionpool: Starting new HTTP connection (1): 127.0.0.1:8000
+[17:16:55][DEBUG] urllib3.connectionpool: Starting new HTTP connection (1): 127.0.0.1:8000
+[17:16:55][DEBUG] urllib3.connectionpool: http://127.0.0.1:8000 "GET /api/admin/courses HTTP/1.1" 403 34
+[17:16:55][DEBUG] urllib3.connectionpool: http://127.0.0.1:8000 "GET /api/admin/courses HTTP/1.1" 403 34
+[17:16:55][DEBUG] urllib3.connectionpool: http://127.0.0.1:8000 "GET /api/master/plans HTTP/1.1" 200 27
+[17:16:55][DEBUG] urllib3.connectionpool: http://127.0.0.1:8000 "GET /api/master/plans HTTP/1.1" 200 27
+[17:16:55][DEBUG] urllib3.connectionpool: http://127.0.0.1:8000 "GET /api/master/apprentices HTTP/1.1" 200 120
+[17:16:55][DEBUG] urllib3.connectionpool: http://127.0.0.1:8000 "GET /api/master/apprentices HTTP/1.1" 200 120
+[17:16:56][DEBUG] ui.main_window: 开始构建页面 pid=master_apprentices
+[17:16:56][DEBUG] ui.main_window: 开始构建页面 pid=master_apprentices
+[17:16:56][DEBUG] ui.main_window: 页面构建完成 pid=master_apprentices
+[17:16:56][DEBUG] ui.main_window: 页面构建完成 pid=master_apprentices
+[17:16:56][DEBUG] urllib3.connectionpool: Starting new HTTP connection (1): 127.0.0.1:8000
+[17:16:56][DEBUG] urllib3.connectionpool: Starting new HTTP connection (1): 127.0.0.1:8000
+[17:16:56][DEBUG] urllib3.connectionpool: http://127.0.0.1:8000 "GET /api/master/apprentices HTTP/1.1" 200 120
+[17:16:56][DEBUG] urllib3.connectionpool: http://127.0.0.1:8000 "GET /api/master/apprentices HTTP/1.1" 200 120
+[17:16:59][DEBUG] ui.main_window: 开始构建页面 pid=master_apprentices
+[17:16:59][DEBUG] ui.main_window: 开始构建页面 pid=master_apprentices
+[17:16:59][DEBUG] ui.main_window: 页面构建完成 pid=master_apprentices
+[17:16:59][DEBUG] ui.main_window: 页面构建完成 pid=master_apprentices
+[17:16:59][DEBUG] urllib3.connectionpool: Starting new HTTP connection (1): 127.0.0.1:8000
+[17:16:59][DEBUG] urllib3.connectionpool: Starting new HTTP connection (1): 127.0.0.1:8000
+[17:16:59][DEBUG] urllib3.connectionpool: http://127.0.0.1:8000 "GET /api/master/apprentices HTTP/1.1" 200 120
+[17:16:59][DEBUG] urllib3.connectionpool: http://127.0.0.1:8000 "GET /api/master/apprentices HTTP/1.1" 200 120
+[17:17:00][DEBUG] ui.main_window: 开始构建页面 pid=master_plans
+[17:17:00][DEBUG] ui.main_window: 开始构建页面 pid=master_plans
+[17:17:00][DEBUG] ui.main_window: 页面构建完成 pid=master_plans
+[17:17:00][DEBUG] ui.main_window: 页面构建完成 pid=master_plans
+[17:17:00][DEBUG] urllib3.connectionpool: Starting new HTTP connection (1): 127.0.0.1:8000
+[17:17:00][DEBUG] urllib3.connectionpool: Starting new HTTP connection (1): 127.0.0.1:8000
+[17:17:00][DEBUG] urllib3.connectionpool: Starting new HTTP connection (1): 127.0.0.1:8000
+[17:17:00][DEBUG] urllib3.connectionpool: Starting new HTTP connection (1): 127.0.0.1:8000
+[17:17:00][DEBUG] urllib3.connectionpool: Starting new HTTP connection (1): 127.0.0.1:8000
+[17:17:00][DEBUG] urllib3.connectionpool: Starting new HTTP connection (1): 127.0.0.1:8000
+[17:17:00][DEBUG] urllib3.connectionpool: http://127.0.0.1:8000 "GET /api/admin/courses HTTP/1.1" 403 34
+[17:17:00][DEBUG] urllib3.connectionpool: http://127.0.0.1:8000 "GET /api/admin/courses HTTP/1.1" 403 34
+[17:17:00][DEBUG] urllib3.connectionpool: http://127.0.0.1:8000 "GET /api/master/apprentices HTTP/1.1" 200 120
+[17:17:00][DEBUG] urllib3.connectionpool: http://127.0.0.1:8000 "GET /api/master/apprentices HTTP/1.1" 200 120
+[17:17:00][DEBUG] urllib3.connectionpool: http://127.0.0.1:8000 "GET /api/master/plans HTTP/1.1" 200 27
+[17:17:00][DEBUG] urllib3.connectionpool: http://127.0.0.1:8000 "GET /api/master/plans HTTP/1.1" 200 27
+[17:17:03][DEBUG] ui.main_window: 开始构建页面 pid=master_grading
+[17:17:03][DEBUG] ui.main_window: 开始构建页面 pid=master_grading
+[17:17:03][DEBUG] ui.main_window: 页面构建完成 pid=master_grading
+[17:17:03][DEBUG] ui.main_window: 页面构建完成 pid=master_grading
+[17:17:03][DEBUG] urllib3.connectionpool: Starting new HTTP connection (1): 127.0.0.1:8000
+[17:17:03][DEBUG] urllib3.connectionpool: Starting new HTTP connection (1): 127.0.0.1:8000
+[17:17:03][DEBUG] urllib3.connectionpool: http://127.0.0.1:8000 "GET /api/master/apprentices HTTP/1.1" 200 120
+[17:17:03][DEBUG] urllib3.connectionpool: http://127.0.0.1:8000 "GET /api/master/apprentices HTTP/1.1" 200 120
+[17:17:11][DEBUG] ui.main_window: 开始构建页面 pid=master_apprentices
+[17:17:11][DEBUG] ui.main_window: 开始构建页面 pid=master_apprentices
+[17:17:11][DEBUG] ui.main_window: 页面构建完成 pid=master_apprentices
+[17:17:11][DEBUG] ui.main_window: 页面构建完成 pid=master_apprentices
+[17:17:11][DEBUG] urllib3.connectionpool: Starting new HTTP connection (1): 127.0.0.1:8000
+[17:17:11][DEBUG] urllib3.connectionpool: Starting new HTTP connection (1): 127.0.0.1:8000
+[17:17:11][DEBUG] urllib3.connectionpool: http://127.0.0.1:8000 "GET /api/master/apprentices HTTP/1.1" 200 120
+[17:17:11][DEBUG] urllib3.connectionpool: http://127.0.0.1:8000 "GET /api/master/apprentices HTTP/1.1" 200 120
+[17:17:38][DEBUG] ui.main_window: 开始构建页面 pid=master_plans
+[17:17:38][DEBUG] ui.main_window: 开始构建页面 pid=master_plans
+[17:17:38][DEBUG] ui.main_window: 页面构建完成 pid=master_plans
+[17:17:38][DEBUG] ui.main_window: 页面构建完成 pid=master_plans
+[17:17:38][DEBUG] urllib3.connectionpool: Starting new HTTP connection (1): 127.0.0.1:8000
+[17:17:38][DEBUG] urllib3.connectionpool: Starting new HTTP connection (1): 127.0.0.1:8000
+[17:17:38][DEBUG] urllib3.connectionpool: Starting new HTTP connection (1): 127.0.0.1:8000
+[17:17:38][DEBUG] urllib3.connectionpool: Starting new HTTP connection (1): 127.0.0.1:8000
+[17:17:38][DEBUG] urllib3.connectionpool: Starting new HTTP connection (1): 127.0.0.1:8000
+[17:17:38][DEBUG] urllib3.connectionpool: Starting new HTTP connection (1): 127.0.0.1:8000
+[17:17:38][DEBUG] urllib3.connectionpool: http://127.0.0.1:8000 "GET /api/admin/courses HTTP/1.1" 403 34
+[17:17:38][DEBUG] urllib3.connectionpool: http://127.0.0.1:8000 "GET /api/admin/courses HTTP/1.1" 403 34
+[17:17:38][DEBUG] urllib3.connectionpool: http://127.0.0.1:8000 "GET /api/master/apprentices HTTP/1.1" 200 120
+[17:17:38][DEBUG] urllib3.connectionpool: http://127.0.0.1:8000 "GET /api/master/apprentices HTTP/1.1" 200 120
+[17:17:38][DEBUG] urllib3.connectionpool: http://127.0.0.1:8000 "GET /api/master/plans HTTP/1.1" 200 27
+[17:17:38][DEBUG] urllib3.connectionpool: http://127.0.0.1:8000 "GET /api/master/plans HTTP/1.1" 200 27
+[17:17:40][DEBUG] ui.main_window: 开始构建页面 pid=master_grading
+[17:17:40][DEBUG] ui.main_window: 开始构建页面 pid=master_grading
+[17:17:40][DEBUG] ui.main_window: 页面构建完成 pid=master_grading
+[17:17:40][DEBUG] ui.main_window: 页面构建完成 pid=master_grading
+[17:17:40][DEBUG] urllib3.connectionpool: Starting new HTTP connection (1): 127.0.0.1:8000
+[17:17:40][DEBUG] urllib3.connectionpool: Starting new HTTP connection (1): 127.0.0.1:8000
+[17:17:40][DEBUG] urllib3.connectionpool: http://127.0.0.1:8000 "GET /api/master/apprentices HTTP/1.1" 200 120
+[17:17:40][DEBUG] urllib3.connectionpool: http://127.0.0.1:8000 "GET /api/master/apprentices HTTP/1.1" 200 120
+[17:17:40][DEBUG] ui.main_window: 开始构建页面 pid=master_dashboard
+[17:17:40][DEBUG] ui.main_window: 开始构建页面 pid=master_dashboard
+[17:17:40][DEBUG] ui.main_window: 页面构建完成 pid=master_dashboard
+[17:17:40][DEBUG] ui.main_window: 页面构建完成 pid=master_dashboard
+[17:17:40][DEBUG] urllib3.connectionpool: Starting new HTTP connection (1): 127.0.0.1:8000
+[17:17:40][DEBUG] urllib3.connectionpool: Starting new HTTP connection (1): 127.0.0.1:8000
+[17:17:40][DEBUG] urllib3.connectionpool: http://127.0.0.1:8000 "GET /api/master/apprentices HTTP/1.1" 200 120
+[17:17:40][DEBUG] urllib3.connectionpool: http://127.0.0.1:8000 "GET /api/master/apprentices HTTP/1.1" 200 120
+[17:17:41][DEBUG] ui.main_window: 开始构建页面 pid=master_grading
+[17:17:41][DEBUG] ui.main_window: 开始构建页面 pid=master_grading
+[17:17:41][DEBUG] ui.main_window: 页面构建完成 pid=master_grading
+[17:17:41][DEBUG] ui.main_window: 页面构建完成 pid=master_grading
+[17:17:41][DEBUG] urllib3.connectionpool: Starting new HTTP connection (1): 127.0.0.1:8000
+[17:17:41][DEBUG] urllib3.connectionpool: Starting new HTTP connection (1): 127.0.0.1:8000
+[17:17:41][DEBUG] urllib3.connectionpool: http://127.0.0.1:8000 "GET /api/master/apprentices HTTP/1.1" 200 120
+[17:17:41][DEBUG] urllib3.connectionpool: http://127.0.0.1:8000 "GET /api/master/apprentices HTTP/1.1" 200 120
+[17:17:42][DEBUG] ui.main_window: 开始构建页面 pid=progress_view
+[17:17:42][DEBUG] ui.main_window: 开始构建页面 pid=progress_view
+[17:17:42][DEBUG] ui.main_window: 页面构建完成 pid=progress_view
+[17:17:42][DEBUG] ui.main_window: 页面构建完成 pid=progress_view
+[17:17:42][DEBUG] urllib3.connectionpool: Starting new HTTP connection (1): 127.0.0.1:8000
+[17:17:42][DEBUG] urllib3.connectionpool: Starting new HTTP connection (1): 127.0.0.1:8000
+[17:17:42][DEBUG] urllib3.connectionpool: http://127.0.0.1:8000 "GET /api/progress/company HTTP/1.1" 200 231
+[17:17:42][DEBUG] urllib3.connectionpool: http://127.0.0.1:8000 "GET /api/progress/company HTTP/1.1" 200 231
+[17:17:44][DEBUG] ui.main_window: 开始构建页面 pid=social_posts
+[17:17:44][DEBUG] ui.main_window: 开始构建页面 pid=social_posts
+[17:17:44][DEBUG] ui.main_window: 页面构建完成 pid=social_posts
+[17:17:44][DEBUG] ui.main_window: 页面构建完成 pid=social_posts
+[17:17:44][DEBUG] urllib3.connectionpool: Starting new HTTP connection (1): 127.0.0.1:8000
+[17:17:44][DEBUG] urllib3.connectionpool: Starting new HTTP connection (1): 127.0.0.1:8000
+[17:17:44][DEBUG] urllib3.connectionpool: http://127.0.0.1:8000 "GET /api/posts HTTP/1.1" 200 27
+[17:17:44][DEBUG] urllib3.connectionpool: http://127.0.0.1:8000 "GET /api/posts HTTP/1.1" 200 27
+[17:17:44][DEBUG] ui.main_window: 开始构建页面 pid=notifications
+[17:17:44][DEBUG] ui.main_window: 开始构建页面 pid=notifications
+[17:17:44][DEBUG] ui.main_window: 页面构建完成 pid=notifications
+[17:17:44][DEBUG] ui.main_window: 页面构建完成 pid=notifications
+[17:17:44][DEBUG] urllib3.connectionpool: Starting new HTTP connection (1): 127.0.0.1:8000
+[17:17:44][DEBUG] urllib3.connectionpool: Starting new HTTP connection (1): 127.0.0.1:8000
+[17:17:44][DEBUG] urllib3.connectionpool: http://127.0.0.1:8000 "GET /api/notifications HTTP/1.1" 200 52
+[17:17:44][DEBUG] urllib3.connectionpool: http://127.0.0.1:8000 "GET /api/notifications HTTP/1.1" 200 52
+[17:17:45][DEBUG] ui.main_window: 开始构建页面 pid=master_ingest
+[17:17:45][DEBUG] ui.main_window: 开始构建页面 pid=master_ingest
+[17:17:45][DEBUG] ui.master: === _build_master_ingest 开始构建投喂资料页 ===
+[17:17:45][DEBUG] ui.master: === _build_master_ingest 开始构建投喂资料页 ===
+[17:17:45][DEBUG] ui.master: === _build_master_ingest 开始构建投喂资料页 ===
+[17:17:45][DEBUG] ui.master: 已创建按钮 btn1=[开始投喂] object=<PyQt5.QtWidgets.QPushButton object at 0x000001BE871BE2A0>
+[17:17:45][DEBUG] ui.master: 已创建按钮 btn1=[开始投喂] object=<PyQt5.QtWidgets.QPushButton object at 0x000001BE871BE2A0>
+[17:17:45][DEBUG] ui.master: 已创建按钮 btn1=[开始投喂] object=<PyQt5.QtWidgets.QPushButton object at 0x000001BE871BE2A0>
+[17:17:45][DEBUG] ui.master: 已创建按钮 btn2=[抓取并投喂] object=<PyQt5.QtWidgets.QPushButton object at 0x000001BE871C5F40>
+[17:17:45][DEBUG] ui.master: 已创建按钮 btn2=[抓取并投喂] object=<PyQt5.QtWidgets.QPushButton object at 0x000001BE871C5F40>
+[17:17:45][DEBUG] ui.master: 已创建按钮 btn2=[抓取并投喂] object=<PyQt5.QtWidgets.QPushButton object at 0x000001BE871C5F40>
+[17:17:45][DEBUG] ui.master: === _build_master_ingest 完成，g1/g2/g3 均已加入 layout ===
+[17:17:45][DEBUG] ui.master: === _build_master_ingest 完成，g1/g2/g3 均已加入 layout ===
+[17:17:45][DEBUG] ui.master: === _build_master_ingest 完成，g1/g2/g3 均已加入 layout ===
+[17:17:45][DEBUG] ui.main_window: 页面构建完成 pid=master_ingest
+[17:17:45][DEBUG] ui.main_window: 页面构建完成 pid=master_ingest
+[17:17:46][DEBUG] ui.main_window: 开始构建页面 pid=master_overview
+[17:17:46][DEBUG] ui.main_window: 开始构建页面 pid=master_overview
+[17:17:46][DEBUG] ui.main_window: 页面构建完成 pid=master_overview
+[17:17:46][DEBUG] ui.main_window: 页面构建完成 pid=master_overview
+[17:17:46][DEBUG] urllib3.connectionpool: Starting new HTTP connection (1): 127.0.0.1:8000
+[17:17:46][DEBUG] urllib3.connectionpool: Starting new HTTP connection (1): 127.0.0.1:8000
+[17:17:46][DEBUG] urllib3.connectionpool: http://127.0.0.1:8000 "GET /api/master/knowledge HTTP/1.1" 200 42
+[17:17:46][DEBUG] urllib3.connectionpool: http://127.0.0.1:8000 "GET /api/master/knowledge HTTP/1.1" 200 42
+[17:17:46][DEBUG] urllib3.connectionpool: Starting new HTTP connection (1): 127.0.0.1:8000
+[17:17:46][DEBUG] urllib3.connectionpool: Starting new HTTP connection (1): 127.0.0.1:8000
+[17:17:46][DEBUG] urllib3.connectionpool: http://127.0.0.1:8000 "GET /api/master/apprentices HTTP/1.1" 200 120
+[17:17:46][DEBUG] urllib3.connectionpool: http://127.0.0.1:8000 "GET /api/master/apprentices HTTP/1.1" 200 120
+[17:18:53][DEBUG] urllib3.connectionpool: Starting new HTTP connection (1): 127.0.0.1:8000
+[17:18:53][DEBUG] urllib3.connectionpool: Starting new HTTP connection (1): 127.0.0.1:8000
+[17:18:53][DEBUG] urllib3.connectionpool: http://127.0.0.1:8000 "GET /api/companies HTTP/1.1" 200 60
+[17:18:53][DEBUG] urllib3.connectionpool: http://127.0.0.1:8000 "GET /api/companies HTTP/1.1" 200 60
+[17:19:04][DEBUG] urllib3.connectionpool: Starting new HTTP connection (1): 127.0.0.1:8000
+[17:19:04][DEBUG] urllib3.connectionpool: Starting new HTTP connection (1): 127.0.0.1:8000
+[17:19:04][DEBUG] urllib3.connectionpool: http://127.0.0.1:8000 "POST /api/login HTTP/1.1" 200 264
+[17:19:04][DEBUG] urllib3.connectionpool: http://127.0.0.1:8000 "POST /api/login HTTP/1.1" 200 264
+[17:19:04][DEBUG] ui.main_window: 开始构建页面 pid=master_overview
+[17:19:04][DEBUG] ui.main_window: 开始构建页面 pid=master_overview
+[17:19:04][DEBUG] ui.main_window: 页面构建完成 pid=master_overview
+[17:19:04][DEBUG] ui.main_window: 页面构建完成 pid=master_overview
+[17:19:04][DEBUG] urllib3.connectionpool: Starting new HTTP connection (1): 127.0.0.1:8000
+[17:19:04][DEBUG] urllib3.connectionpool: Starting new HTTP connection (1): 127.0.0.1:8000
+[17:19:04][DEBUG] urllib3.connectionpool: Starting new HTTP connection (1): 127.0.0.1:8000
+[17:19:04][DEBUG] urllib3.connectionpool: Starting new HTTP connection (1): 127.0.0.1:8000
+[17:19:04][DEBUG] urllib3.connectionpool: http://127.0.0.1:8000 "GET /api/master/knowledge HTTP/1.1" 200 42
+[17:19:04][DEBUG] urllib3.connectionpool: http://127.0.0.1:8000 "GET /api/master/knowledge HTTP/1.1" 200 42
+[17:19:04][DEBUG] urllib3.connectionpool: http://127.0.0.1:8000 "GET /api/notifications HTTP/1.1" 200 52
+[17:19:04][DEBUG] urllib3.connectionpool: http://127.0.0.1:8000 "GET /api/notifications HTTP/1.1" 200 52
+[17:19:04][DEBUG] urllib3.connectionpool: Starting new HTTP connection (1): 127.0.0.1:8000
+[17:19:04][DEBUG] urllib3.connectionpool: Starting new HTTP connection (1): 127.0.0.1:8000
+[17:19:04][DEBUG] urllib3.connectionpool: http://127.0.0.1:8000 "GET /api/master/apprentices HTTP/1.1" 200 120
+[17:19:04][DEBUG] urllib3.connectionpool: http://127.0.0.1:8000 "GET /api/master/apprentices HTTP/1.1" 200 120
+[17:19:06][DEBUG] ui.main_window: 开始构建页面 pid=master_apprentices
+[17:19:06][DEBUG] ui.main_window: 开始构建页面 pid=master_apprentices
+[17:19:06][DEBUG] ui.main_window: 页面构建完成 pid=master_apprentices
+[17:19:06][DEBUG] ui.main_window: 页面构建完成 pid=master_apprentices
+[17:19:06][DEBUG] urllib3.connectionpool: Starting new HTTP connection (1): 127.0.0.1:8000
+[17:19:06][DEBUG] urllib3.connectionpool: Starting new HTTP connection (1): 127.0.0.1:8000
+[17:19:06][DEBUG] urllib3.connectionpool: http://127.0.0.1:8000 "GET /api/master/apprentices HTTP/1.1" 200 120
+[17:19:06][DEBUG] urllib3.connectionpool: http://127.0.0.1:8000 "GET /api/master/apprentices HTTP/1.1" 200 120
+[17:19:21][DEBUG] urllib3.connectionpool: Starting new HTTP connection (1): 127.0.0.1:8000
+[17:19:21][DEBUG] urllib3.connectionpool: Starting new HTTP connection (1): 127.0.0.1:8000
+[17:19:21][DEBUG] urllib3.connectionpool: http://127.0.0.1:8000 "POST /api/master/apprentices HTTP/1.1" 200 141
+[17:19:21][DEBUG] urllib3.connectionpool: http://127.0.0.1:8000 "POST /api/master/apprentices HTTP/1.1" 200 141
+[17:19:21][DEBUG] ui.main_window: 开始构建页面 pid=master_apprentices
+[17:19:21][DEBUG] ui.main_window: 开始构建页面 pid=master_apprentices
+[17:19:21][DEBUG] ui.main_window: 页面构建完成 pid=master_apprentices
+[17:19:21][DEBUG] ui.main_window: 页面构建完成 pid=master_apprentices
+[17:19:21][DEBUG] urllib3.connectionpool: Starting new HTTP connection (1): 127.0.0.1:8000
+[17:19:21][DEBUG] urllib3.connectionpool: Starting new HTTP connection (1): 127.0.0.1:8000
+[17:19:21][DEBUG] urllib3.connectionpool: http://127.0.0.1:8000 "GET /api/master/apprentices HTTP/1.1" 200 196
+[17:19:21][DEBUG] urllib3.connectionpool: http://127.0.0.1:8000 "GET /api/master/apprentices HTTP/1.1" 200 196
+[17:22:56][DEBUG] urllib3.connectionpool: Starting new HTTP connection (1): 127.0.0.1:8000
+[17:22:56][DEBUG] urllib3.connectionpool: Starting new HTTP connection (1): 127.0.0.1:8000
+[17:22:56][DEBUG] urllib3.connectionpool: http://127.0.0.1:8000 "GET /api/companies HTTP/1.1" 200 60
+[17:22:56][DEBUG] urllib3.connectionpool: http://127.0.0.1:8000 "GET /api/companies HTTP/1.1" 200 60
+[17:23:01][DEBUG] urllib3.connectionpool: Starting new HTTP connection (1): 127.0.0.1:8000
+[17:23:01][DEBUG] urllib3.connectionpool: Starting new HTTP connection (1): 127.0.0.1:8000
+[17:23:01][DEBUG] urllib3.connectionpool: http://127.0.0.1:8000 "POST /api/login HTTP/1.1" 200 257
+[17:23:01][DEBUG] urllib3.connectionpool: http://127.0.0.1:8000 "POST /api/login HTTP/1.1" 200 257
+[17:23:01][DEBUG] ui.main_window: 开始构建页面 pid=appr_overview
+[17:23:01][DEBUG] ui.main_window: 开始构建页面 pid=appr_overview
+[17:23:01][DEBUG] ui.main_window: 页面构建完成 pid=appr_overview
+[17:23:01][DEBUG] ui.main_window: 页面构建完成 pid=appr_overview
+[17:23:01][DEBUG] urllib3.connectionpool: Starting new HTTP connection (1): 127.0.0.1:8000
+[17:23:01][DEBUG] urllib3.connectionpool: Starting new HTTP connection (1): 127.0.0.1:8000
+[17:23:01][DEBUG] urllib3.connectionpool: Starting new HTTP connection (1): 127.0.0.1:8000
+[17:23:01][DEBUG] urllib3.connectionpool: Starting new HTTP connection (1): 127.0.0.1:8000
+[17:23:01][DEBUG] urllib3.connectionpool: http://127.0.0.1:8000 "GET /api/notifications HTTP/1.1" 200 52
+[17:23:01][DEBUG] urllib3.connectionpool: http://127.0.0.1:8000 "GET /api/notifications HTTP/1.1" 200 52
+[17:23:01][DEBUG] urllib3.connectionpool: http://127.0.0.1:8000 "GET /api/apprentice/mistakes HTTP/1.1" 200 58
+[17:23:01][DEBUG] urllib3.connectionpool: http://127.0.0.1:8000 "GET /api/apprentice/mistakes HTTP/1.1" 200 58
+[17:23:03][DEBUG] ui.main_window: 开始构建页面 pid=appr_assess
+[17:23:03][DEBUG] ui.main_window: 开始构建页面 pid=appr_assess
+[17:23:03][DEBUG] ui.main_window: 页面构建完成 pid=appr_assess
+[17:23:03][DEBUG] ui.main_window: 页面构建完成 pid=appr_assess
