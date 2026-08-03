@@ -12,7 +12,7 @@ class NotifyPagesMixin:
     def _build_notifications(self, layout, container):
         head = QHBoxLayout()
         self._unread_lbl = QLabel("")
-        self._unread_lbl.setStyleSheet(f"color:{Color.TEXT_SUB};font-size:15px;font-weight:600;")
+        self._unread_lbl.setStyleSheet(f"color:{Color.TEXT_SUB};font-size:20px;font-weight:600;")
         head.addWidget(self._unread_lbl)
         head.addStretch()
         mark_btn = secondary_button("全部标为已读")
@@ -40,17 +40,17 @@ class NotifyPagesMixin:
                 nl = QHBoxLayout(nf)
                 if is_unread:
                     dot = QLabel("●")
-                    dot.setStyleSheet(f"color:{Color.PRIMARY};font-size:12px;")
+                    dot.setStyleSheet(f"color:{Color.PRIMARY};font-size:17px;")
                     nl.addWidget(dot)
                 nl.addWidget(badge(n.get("type", "系统"), Color.INFO, "#e0f2fe"))
                 content = QLabel(n.get("content", ""))
                 content.setWordWrap(True)
                 content.setStyleSheet(
-                    f'color:{Color.TEXT};font-size:14.5px;'
+                    f'color:{Color.TEXT};font-size:19.5px;'
                     f'font-weight:{"600" if is_unread else "400"};')
                 nl.addWidget(content, 1)
                 t = QLabel(str(n.get("created_at", ""))[:16])
-                t.setStyleSheet(f"color:{Color.TEXT_MUTED};font-size:13px;")
+                t.setStyleSheet(f"color:{Color.TEXT_MUTED};font-size:18px;")
                 nl.addWidget(t)
                 layout.addWidget(nf)
 

@@ -24,12 +24,15 @@
 
 ```
 ┌─ card ────────────────┐    ┌─ stat_card ──────────┐    ┌─ badge ─────┐
-│ 白卡+1px边框+圆角LG16   │    │  38px 大数字 / 15px说明 │    │ PILL圆角 柔和底 │
-│ 可选 accent 左边框      │    └──────────────────────┘    └────────────┘
+│ 白卡+1px边框+圆角LG16   │    │  43px 大数字 / 20px说明 │    │ PILL圆角 柔和底 │
+│ 默认padding 26(放大)   │    │  padding 28(放大)      │    └────────────┘
+│ 可选 accent 左边框      │    └──────────────────────┘
 └────────────────────────┘
- 按钮家族(QPushButton)：[主按钮]红底白字 / [次要]白底边框 / [成功]绿 / [危险]深红 / [幽灵]透明红字 / [投喂]白底红框红字
- 标签家族：title_label(30/800) subtitle_label(15.5灰) section_label(18/700) hint_label(灰) 
- loading_label / empty_label / divider / apply_shadow(投影)
+ 按钮家族(QPushButton)：[主按钮]红底白字(20px,min-h48) / [次要]白底边框 / [成功]绿 / [危险]深红 / [幽灵]透明红字(20px) / [投喂]白底红框红字(20px,min-h48)
+ 标签家族：title_label(35/800) subtitle_label(20.5灰) section_label(23/700) hint_label(19px灰) 
+ loading_label(21px) / empty_label(21px) / divider / apply_shadow(投影)
+ 全局字号统一放大 5px：QLabel 基础 19px、QLineEdit/QTextEdit/QComboBox 20px、表格 19.5px/表头19px、GroupBox 21px、单选复选 20px；
+ 所有按钮加 min-height 防文字截断；card 默认 padding 20→26、stat_card 22→28 增加留白。
 ```
 
 ### 0.2 应用窗口骨架（MainWindow，三类共用）
@@ -54,19 +57,19 @@
 
 ### 0.3 侧边栏（SIDEBAR_QSS 专属，三类共用骨架 / 选项卡按角色不同）
 
-`objectName=="sidebar"` 的 QWidget，仅 SIDEBAR_QSS 生效。按钮可勾选（`QButtonGroup` 互斥），选中态左边框 4px 白 + 半透明白底；底部 `userinfo` + `logoutBtn`。**骨架与样式三类完全一致，但选项卡清单由 `ROLE_PAGES[role]` 决定，三类别完全不同**（公共页"🔔 通知 / 💬 交流圈 / 📈 进度排名"三类均有，仅管理员把"进度排名"改为"📈 进度视图"且 pid=`admin_progress`）。各角色完整选项卡清单与专属侧边栏 UI 见 §一/§二/§三章首图。
+`objectName=="sidebar"` 的 QWidget，仅 SIDEBAR_QSS 生效。侧边栏**宽度放大 1.5 倍（min/max-width `252px → 378px`）**，内部**所有字号增大 5px**（导航按钮 15→20、logo 24→29、logoSub 12.5→17.5、userinfo 13.5→18.5）；**导航按钮高度自适应内部文字**（`min-height:56px` + `padding:18px 32px`，不再固定高度，文字完整不截断）。按钮可勾选（`QButtonGroup` 互斥），选中态左边框 4px 白 + 半透明白底；底部 `userinfo` + `logoutBtn`。**骨架与样式三类完全一致，但选项卡清单由 `ROLE_PAGES[role]` 决定，三类别完全不同**（公共页"🔔 通知 / 💬 交流圈 / 📈 进度排名"三类均有，仅管理员把"进度排名"改为"📈 进度视图"且 pid=`admin_progress`）。各角色完整选项卡清单与专属侧边栏 UI 见 §一/§二/§三章首图。
 
 ```
-┌────────────────┐
-│ 🔥 薪火          │  ← logo (24px/800/#fff)
-│ 师傅带徒·AI导师   │  ← logoSub (12.5px/#e8b6b6)
-│ ─────────────── │
-│  [导航按钮…]      │  ← 由 ROLE_PAGES[role] 逐项生成, 互斥勾选
-│  (addStretch)    │
-│  👤 张三          │  ← userinfo (#f0c4c4/13.5px) = full_name / username
-│     师傅          │  ← role_names: admin=管理员 / master=师傅 / apprentice=徒弟
-│  🚪 退出登录       │  ← logoutBtn (#ffd9a8) → _logout()
-└────────────────┘
+┌────────────────────┐
+│ 🔥 薪火              │  ← logo (29px/800/#fff)
+│ 师傅带徒·AI导师       │  ← logoSub (17.5px/#e8b6b6)
+│ ────────────────── │
+│  [ 导航按钮… ]        │  ← 由 ROLE_PAGES[role] 生成, 20px, min-height 56px 自适应
+│  (addStretch)        │
+│  👤 张三              │  ← userinfo (#f0c4c4/18.5px) = full_name / username
+│     师傅              │  ← role_names: admin=管理员 / master=师傅 / apprentice=徒弟
+│  🚪 退出登录           │  ← logoutBtn (#ffd9a8) → _logout()
+└────────────────────┘
    导航按钮生成: for pid in page_ids: QPushButton(PAGE_META[pid][0])
    选中态: rgba(255,255,255,.18)+白字+左边框4px白 (SIDEBAR_QSS)
    通知按钮: 进入后 _refresh_notify_badge() 改写文案 "🔔 通知 (N)"
@@ -82,7 +85,7 @@
 
 ### 0.4 登录 / 注册对话框（LoginDialog，三类入口共用）
 
-`QDialog` 固定 `540×720`，红白渐变背景，`_RED_WHITE_QSS` 仅作用于本对话框。顶部两个可勾选 `tabBtn`（登录/注册，互斥），点击切换内部 `QStackedWidget` 的两种独立表单；**底部提交按钮 `authBtn` 随模式变文案**（`_do_auth` 按 `currentIndex` 分流到 login / register 两个接口）。两个表单为**独立 Widget**，字段完全不同，分别绘制如下。
+`QDialog` 固定 `660×980`，红白渐变背景，`_RED_WHITE_QSS` 仅作用于本对话框。整体字号较此前放大 5px（QLabel 14.5→19、loginTitle 28→33、loginSub/loginMsg 14→19、authBtn 17→22、tabBtn 16→21），输入框 `QLineEdit`/`QComboBox` 的**预览文字(placeholder)与输入文字字号同步放大至 19px，与"用户名"等标签字号一致**，输入框竖直内边距再 +3px（`16px→19px` 上下、左右 18px）避免文字被遮挡；dialog 外边距 `72/54/72/46`、根间距 22，登录表单间距 16、注册表单间距 12 且各列(标签↔输入框)间距 10、行内列间距 18。**注册表单（字段多）整体包入 `QScrollArea`，窗口高度不足时滚动而非压缩输入框**。顶部两个可勾选 `tabBtn`（登录/注册，互斥），点击切换内部 `QStackedWidget` 的两种独立表单；**底部提交按钮 `authBtn` 随模式变文案**（`_do_auth` 按 `currentIndex` 分流到 login / register 两个接口）。两个表单为**独立 Widget**，字段完全不同，分别绘制如下。
 
 #### 0.4.1 登录 UI（_build_login_form，currentIndex=0）
 
@@ -90,14 +93,14 @@
 
 ```
 ┌────────────────────────────────────┐
-│      🔥 薪火 · AI 导师系统          │  ← loginTitle (28px/800/#b91c1c)
-│      师傅带徒 · 知识传承 · AI 加速   │  ← loginSub (14px/#9c8a8a)
-│  [ 登 录 ]     [ 注 册 ]            │  ← tabBtn：登录=选中(底部3px红下划线)
+│      🔥 薪火 · AI 导师系统          │  ← loginTitle (33px/800/#b91c1c)
+│      师傅带徒 · 知识传承 · AI 加速   │  ← loginSub (19px/#9c8a8a)
+│  [ 登 录 ]     [ 注 册 ]            │  ← tabBtn(21px)：登录=选中(底部3px红下划线)
 │  ────────────────────────────────  │  ← tabLine(QFrame.HLine)
-│  用户名                              │
-│  [______________________________]  │  ← l_uname (QLineEdit, placeholder=输入用户名)
-│  密码                                │
-│  [______________________________]  │  ← l_pwd (Password掩码, placeholder=输入密码)
+│  用户名                              │  ← 标签 19px
+│  [______________________________]  │  ← l_uname (QLineEdit, 19px, placeholder=输入用户名)
+│  密码                                │  ← 标签 19px
+│  [______________________________]  │  ← l_pwd (19px, Password掩码, placeholder=输入密码)
 │                                     │
 │                                     │  ← addStretch() 撑出底部空白
 └────────────────────────────────────┘
@@ -125,7 +128,7 @@
 │  ┌ 角色*  ┐  ┌ 公司    ┐          │  ← row4: r_role(QComboBox 师傅|管理员)
 │  │[师傅▾]│  │[默认公司▾]│        │  ←      r_company(来自 GET /api/companies)
 │  └────────┘  └────────┘          │
-│  💡 徒弟账号由师傅在系统内创建；      │  ← tip(13px/#9c8a8a)
+│  💡 徒弟账号由师傅在系统内创建；      │  ← tip(18px/#9c8a8a)
 │     注册后需管理员审核通过方可登录。  │
 └────────────────────────────────────┘
          (下接通用 消息区 + 提交按钮，见 0.4.3)
@@ -138,7 +141,7 @@
 ```
 ┌────────────────────────────────────┐
 │      (loginMsg 消息区, 居中可换行)    │  ← 失败红 / 审核橙warn / 成功绿
-│      [    登 录 / 注 册    ]        │  ← authBtn 红橙渐变(禁用态灰)
+│      [    登 录 / 注 册    ]        │  ← authBtn 红橙渐变(22px/700, 禁用态灰)
 └────────────────────────────────────┘
    登录成功 → token/user 写入, accept() 进入主窗口
    登录被拦(含"审核") → ⏳ 橙色提示, 停留本对话框

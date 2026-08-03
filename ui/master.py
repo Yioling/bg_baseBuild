@@ -193,16 +193,16 @@ class MasterPagesMixin:
                 dl = QVBoxLayout(df)
                 dl.setSpacing(6)
                 name = QLabel(d.get("name", ""))
-                name.setStyleSheet(f"font-weight:700;font-size:16px;color:{Color.TEXT};")
+                name.setStyleSheet(f"font-weight:700;font-size:21px;color:{Color.TEXT};")
                 dl.addWidget(name)
                 if d.get("description"):
                     desc = QLabel(d["description"])
-                    desc.setStyleSheet(f"color:{Color.TEXT_SUB};font-size:14px;")
+                    desc.setStyleSheet(f"color:{Color.TEXT_SUB};font-size:19px;")
                     desc.setWordWrap(True)
                     dl.addWidget(desc)
                 for p in d.get("points", []):
                     row = QLabel(f'· {p.get("title", "")}  [{p.get("level", "")}]')
-                    row.setStyleSheet(f"color:{Color.TEXT};font-size:14.5px;padding-left:6px;")
+                    row.setStyleSheet(f"color:{Color.TEXT};font-size:19.5px;padding-left:6px;")
                     dl.addWidget(row)
                 result_area.addWidget(df)
 
@@ -348,11 +348,11 @@ class MasterPagesMixin:
                 pf = card(padding=12)
                 pl = QHBoxLayout(pf)
                 name = QLabel(f'{p["name"]}  →  {p.get("apprentice_name", "")}')
-                name.setStyleSheet(f"font-weight:600;color:{Color.TEXT};font-size:15px;")
+                name.setStyleSheet(f"font-weight:600;color:{Color.TEXT};font-size:20px;")
                 pl.addWidget(name)
                 pl.addStretch()
                 t = QLabel(str(p.get("created_at", ""))[:16])
-                t.setStyleSheet(f"color:{Color.TEXT_MUTED};font-size:13px;")
+                t.setStyleSheet(f"color:{Color.TEXT_MUTED};font-size:18px;")
                 pl.addWidget(t)
                 layout.addWidget(pf)
 
@@ -397,7 +397,7 @@ class MasterPagesMixin:
                 ql.setSpacing(6)
                 head = QHBoxLayout()
                 title = QLabel(q.get("course_title") or f'任务 #{q.get("plan_item_id", "")}')
-                title.setStyleSheet(f"font-weight:700;color:{Color.TEXT};font-size:15px;")
+                title.setStyleSheet(f"font-weight:700;color:{Color.TEXT};font-size:20px;")
                 head.addWidget(title)
                 head.addWidget(badge(f'第{q.get("attempt", 1)}次',
                                      Color.INFO, "#e0f2fe"))
@@ -409,12 +409,12 @@ class MasterPagesMixin:
                 ql.addLayout(head)
 
                 ans = QLabel(f'答案: {q.get("answer", "")[:200]}')
-                ans.setStyleSheet(f"color:{Color.TEXT_SUB};font-size:14px;")
+                ans.setStyleSheet(f"color:{Color.TEXT_SUB};font-size:19px;")
                 ans.setWordWrap(True)
                 ql.addWidget(ans)
                 ai = QLabel(f'AI 初评: {q.get("ai_score", "-")}    '
                             f'师傅终评: {q.get("master_score") if q.get("master_score") is not None else "未评"}')
-                ai.setStyleSheet(f"color:{Color.TEXT};font-size:14px;font-weight:600;")
+                ai.setStyleSheet(f"color:{Color.TEXT};font-size:19px;font-weight:600;")
                 ql.addWidget(ai)
 
                 grade_row = QHBoxLayout()
@@ -518,7 +518,7 @@ class PathDropLineEdit(QLineEdit):
         self.setAcceptDrops(True)
         self.setStyleSheet(
             "QLineEdit{border:1.5px solid #e6d2d2;border-radius:10px;padding:12px 14px;"
-            "font-size:15px;background:#ffffff;color:#1f1a1a;}"
+            "font-size:20px;background:#ffffff;color:#1f1a1a;}"
             "QLineEdit[focus]{border-color:#dc2626;}"
             "QLineEdit[dragOver=true]{border:2px solid #dc2626;background:#fef2f2;}")
 
@@ -557,7 +557,7 @@ def _mastery_bar(m: dict) -> QVBoxLayout:
     box = QVBoxLayout()
     box.setSpacing(3)
     lbl = QLabel(f'{m.get("dim_name", "")} — {level}')
-    lbl.setStyleSheet(f"color:{Color.TEXT};font-size:14.5px;font-weight:600;")
+    lbl.setStyleSheet(f"color:{Color.TEXT};font-size:19.5px;font-weight:600;")
     box.addWidget(lbl)
     bar = QProgressBar()
     bar.setMaximum(100)
