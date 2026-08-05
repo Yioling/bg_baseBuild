@@ -26,24 +26,34 @@ from backend.agents.planner import generate_plan, get_plan, update_plan_day, upd
 from backend.agents.tutor import ask, generate_lecture_content
 from backend.agents.reviewer import generate_review, grade_review_answer
 from backend.pdf_gen import generate_today_pdf
+from backend.courses import (
+    list_courses as courses_list_courses,
+    create_course, update_course, delete_course,
+    add_course_question, list_course_questions,
+)
+# P6 已提供 list_courses(company_id)。管理员路线已接（/api/admin/courses）；
+# 以下新增 /api/master/courses 给师傅使用（同一函数，不需 admin 守卫，仅同公司隔离）。
 
 app = FastAPI(title="薪火·师傅带徒 AI 导师系统", version="1.0.0")
 
 
-# ---------- P1 添加密码重置模块占位 ----------
+# ---------- P1 装配 P7 账户安全模块（密码重置 / 登录锁定） ----------
 try:
-    from modules.account_security import request_password_reset, reset_password
+    from backend.account_security import (
+        request_password_reset,
+        reset_password,
+        check_lock,
+        record_attempt,
+    )
 except ImportError:
-    def request_password_reset(conn, email):
+    def request_password_reset(conn, email, company_id=1):
         return {"error": "密码重置模块未就绪"}
     def reset_password(conn, token, new_pwd):
         return {"error": "密码重置模块未就绪"}
-
-try:
-    from modules.notification import notify
-except ImportError:
-    def notify(*args, **kwargs):
-        return True
+    def check_lock(username, conn=None, company_id=1):
+        return {"success": True, "locked": False}
+    def record_attempt(username, success, conn=None, company_id=1):
+        return {"success": True, "recorded": False}
 
 
 # 全局向量库实例
@@ -91,21 +101,18 @@ def startup():
 
 
 
-# ========== P1 新增：密码重置接口（修正：使用 get_conn 而非 get_store） ==========
+# ========== P1 装配：密码重置接口 ==========
+# account_security.request_password_reset(identifier, conn=None, company_id=1)
+# 重点：传 None 时模块自取连接并自提交；传 conn 时不提交（事务交由调用方）。
+# 这里走 None 路径，让模块自行 commit，避免多连接事务隔离造成的“写入后读不出”问题。
 @app.post("/api/password/reset-request")
-def api_password_reset_request(
-    req: PasswordResetRequestReq,
-    conn=Depends(get_conn)
-):
-    return request_password_reset(conn, req.email)
+def api_password_reset_request(req: PasswordResetRequestReq):
+    return request_password_reset(req.email, conn=None, company_id=1)
 
 
 @app.post("/api/password/reset")
-def api_password_reset(
-    req: PasswordResetReq,
-    conn=Depends(get_conn)
-):
-    return reset_password(conn, req.token, req.new_password)
+def api_password_reset(req: PasswordResetReq):
+    return reset_password(req.token, req.new_password, conn=None)
 
 
 # ---------- 鉴权依赖 ----------
@@ -502,6 +509,28 @@ def api_delete_course(course_id: int, user: dict = Depends(auth_user)):
     return {"success": True, "message": "课程已删除"}
 
 
+@app.post("/api/admin/courses/{course_id}/questions")
+def api_add_course_question(course_id: int, data: dict, user: dict = Depends(auth_user)):
+    """为课程添加预制检测题。"""
+    if not require_admin(user):
+        raise HTTPException(status_code=403, detail="仅管理员可操作")
+    return add_course_question(
+        course_id,
+        data["question"],
+        data.get("qtype", "short"),
+        data.get("answer_key", ""),
+        data.get("options")
+    )
+
+
+@app.get("/api/admin/courses/{course_id}/questions")
+def api_list_course_questions(course_id: int, user: dict = Depends(auth_user)):
+    """列出课程下的全部预制检测题。"""
+    if not require_admin(user):
+        raise HTTPException(status_code=403, detail="仅管理员可操作")
+    return list_course_questions(course_id)
+
+
 # ==================== V2：培养计划（师傅定制） ====================
 @app.post("/api/master/plans")
 def api_create_plan(data: dict, user: dict = Depends(auth_user)):
@@ -615,16 +644,21 @@ def api_submit_quiz(data: dict, user: dict = Depends(auth_user)):
     
     quiz_id = cur.lastrowid
 
-    # ===== P1 新增：提交检测通知师傅（修正：移到 return 之前，使用 user["user_id"]） =====
-    try:
-        notify(
-            conn=conn,
-            recipient_role='master',
-            content=f'用户 {user["user_id"]} 提交了检测 {quiz_id}',
-            related_id=quiz_id
-        )
-    except Exception as e:
-        print(f"提交检测通知失败: {e}")
+    # ===== 提交检测通知师傅 =====
+    # 重要：与密码重置同问题——若传 conn=conn，notify 模块不 commit，跨连接看不到。
+    # 这里传 conn=None 让 notify 模块自取连接并提交，保证一致性。
+    master_id = user.get("master_id")
+    if master_id:
+        try:
+            from backend.notifications import notify_quiz_submitted
+            notify_quiz_submitted(
+                master_id,
+                apprentice_name=user.get("username") or str(user["user_id"]),
+                conn=None,
+                company_id=user.get("company_id") or 1,
+            )
+        except Exception as e:
+            print(f"提交检测通知失败: {e}")
 
     return {
         "success": True,
@@ -663,6 +697,18 @@ def api_master_view_quizzes(apprentice_id: int, user: dict = Depends(auth_user))
     rows = conn.execute(
         "SELECT * FROM quizzes WHERE apprentice_id=? ORDER BY submitted_at DESC", (apprentice_id,)).fetchall()
     return {"success": True, "quizzes": [dict(r) for r in rows]}
+
+
+@app.get("/api/master/courses")
+def api_master_courses(user: dict = Depends(auth_user)):
+    """师傅查看本公司课程库（用于定制培养计划选课）。
+
+    区别于 /api/admin/courses：后者需 admin 守卫；本端点仅需登录 + 同公司隔离。
+    P1 装配，与 P6 的 list_courses(company_id) 复用。
+    """
+    if not require_master(user):
+        raise HTTPException(status_code=403, detail="仅师傅可操作")
+    return courses_list_courses(user["company_id"])
 
 
 @app.post("/api/master/quizzes/{quiz_id}/score")
@@ -732,7 +778,8 @@ def _build_progress_rows(conn, apprentices: list, company_id: int):
             "total_items": total, "done_items": done,
             "progress_pct": progress_pct, "avg_score": round(avg or 0, 1)
         })
-    rows.sort(key=lambda x: (x["progress_pct"], x["avg_score"]), reverse=True)
+    # 排序：进度降序 → 平均分降序 → ID 升序（稳定排序，避免同分乱跳）
+    rows.sort(key=lambda x: (-x["progress_pct"], -x["avg_score"], x["apprentice_id"]))
     for i, r in enumerate(rows):
         r["rank"] = i + 1
     return rows
@@ -787,10 +834,16 @@ def api_progress_same_master(user: dict = Depends(auth_user)):
         "WHERE role='apprentice' AND master_id=? AND status='approved'",
         (master_id,)).fetchall()
     apps = [dict(r) for r in rows]
+    # 师傅姓名解析：师傅本人展示自己的姓名；徒弟端则按 master_id 查
+    if user["role"] == "master":
+        master_name = user.get("full_name") or user.get("username") or ""
+    else:
+        m_row = conn.execute(
+            "SELECT full_name, username FROM users WHERE id=?", (master_id,)
+        ).fetchone()
+        master_name = (m_row["full_name"] or m_row["username"]) if m_row else ""
     for d in apps:
-        d["master_name"] = user.get("full_name") or user.get("username") if user["role"] == "master" else (
-            conn.execute("SELECT full_name FROM users WHERE id=?", (master_id,)).fetchone()["full_name"] or ""
-        )
+        d["master_name"] = master_name
     return {"success": True, "master_id": master_id,
             "apprentices": _build_progress_rows(conn, apps, user["company_id"])}
 
@@ -876,9 +929,8 @@ def api_read_notification(data: dict, user: dict = Depends(auth_user)):
     return {"success": True}
 
 
-def _notify(conn, user_id: int, ntype: str, content: str, ref_id: int = None, company_id: int = 1):
-    conn.execute("INSERT INTO notifications (user_id, type, content, ref_id, company_id) VALUES (?,?,?,?,?)",
-                 (user_id, ntype, content, ref_id, company_id))
+
+
 
 
 # ==================== V2：管理员后台 ====================
@@ -1022,7 +1074,5 @@ def api_purification_report(user: dict = Depends(auth_user)):
 def api_purification_stats(user: dict = Depends(auth_user)):
     """获取知识库健康统计"""
     from backend.self_purifier import get_purification_stats
-
-    return get_purification_stats()
 
     return get_purification_stats()

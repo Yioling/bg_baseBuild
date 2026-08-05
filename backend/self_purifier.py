@@ -116,7 +116,7 @@ class SelfPurifier:
 
     # ---------- 4. 去重/合并 ----------
     def deduplicate(self, kb_id: int = None, threshold: float = 0.95):
-        """检测余弦相似度 > threshold 的 chunk 对，保留高可信度版本。"""
+        """检测 Jaccard 相似度 > threshold 的 chunk 对，保留高可信度版本。"""
         chunks = self._get_chunks(kb_id)
         if len(chunks) < 2: return self
 
@@ -125,7 +125,7 @@ class SelfPurifier:
             if a["id"] in merged_ids: continue
             for b in chunks[i + 1:]:
                 if b["id"] in merged_ids: continue
-                sim = self._cosine_sim(a.get("text", ""), b.get("text", ""))
+                sim = self._jaccard_sim(a.get("text", ""), b.get("text", ""))
                 if sim > threshold:
                     # 保留较长的版本
                     winner = a if len(a.get("text", "")) >= len(b.get("text", "")) else b
@@ -135,8 +135,8 @@ class SelfPurifier:
                     self.report["stats"]["merged"] += 1
         return self
 
-    def _cosine_sim(self, t1: str, t2: str) -> float:
-        """简易相似度：基于词频的 Jaccard 近似。完整版应用嵌入向量。"""
+    def _jaccard_sim(self, t1: str, t2: str) -> float:
+        """Jaccard 相似度：词集合交并比（注：非余弦相似度，完整版应换嵌入向量）。"""
         if not t1 or not t2: return 0
         w1, w2 = set(t1.split()), set(t2.split())
         if not w1 or not w2: return 0

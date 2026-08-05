@@ -1,8 +1,12 @@
 """轻量向量库：余弦相似度检索，持久化到磁盘（pickle）。
 不依赖外部向量数据库，启动零配置，适合中小规模知识库与比赛演示。"""
+import logging
+import os
 import pickle
 from pathlib import Path
 import numpy as np
+
+logger = logging.getLogger(__name__)
 
 
 class VectorStore:
@@ -54,20 +58,30 @@ class VectorStore:
         path = Path(path)
         path.parent.mkdir(parents=True, exist_ok=True)
         self.path = path
-        with open(path, "wb") as f:
+        tmp = path.with_suffix(path.suffix + ".tmp")
+        with open(tmp, "wb") as f:
             pickle.dump({"docs": self.docs, "matrix": self.matrix}, f)
+        os.replace(str(tmp), str(path))  # 原子替换
 
     @classmethod
     def load(cls, path):
         p = Path(path)
         store = cls()
         if p.exists():
-            with open(p, "rb") as f:
-                data = pickle.load(f)
-            store.docs = data["docs"]
-            store.matrix = data["matrix"]
-            store._normalize()
-            store.path = p
+            try:
+                with open(p, "rb") as f:
+                    data = pickle.load(f)
+                store.docs = data.get("docs", [])
+                store.matrix = data.get("matrix")
+                store._normalize()
+                store.path = p
+            except Exception as exc:
+                # 反序列化可抛异常类型无法穷举（格式错/截断/类移动/版本不兼容），
+                # 目标是"任何失败都降级为空库不崩溃"。KeyboardInterrupt/SystemExit
+                # 继承 BaseException，不会被本句捕获。
+                logger.warning("向量库加载失败，降级为空库: %s", exc)
+                store.docs = []
+                store.matrix = None
         return store
 
 

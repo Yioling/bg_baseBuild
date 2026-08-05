@@ -91,24 +91,28 @@ def _existing_sources(conn, kb_id: int) -> set[str]:
     return {r["location"] for r in rows}
 
 
-def _ingest_chunks(conn, kb_id: int, all_chunks: list[dict], store: VectorStore) -> bool:
-    """对分块执行 嵌入 -> 向量库 -> SQLite 落库。成功返回 True，失败返回 False（不抛异常）。"""
+def _ingest_chunks(conn, kb_id: int, all_chunks: list[dict], store: VectorStore) -> tuple[bool, str]:
+    """对分块执行 嵌入 -> 向量库 -> SQLite 落库。
+
+    返回 (成功?, 错误信息)。成功返回 (True, "")；失败返回 (False, 详细原因)。
+    错误信息会被上游拼入 message，上传者能看到真实原因（例：模型不支持、OOM）。
+    """
     if not all_chunks:
-        return True
+        return True, ""
     # 嵌入
     try:
         from backend.embeddings import embed
         vectors = embed([c["text"] for c in all_chunks])
-    except Exception:
+    except Exception as exc:
         logger.error("向量化失败", exc_info=True)
-        return False
+        return False, f"向量化失败：{exc.__class__.__name__}: {str(exc)[:200]}"
     # 写入内存向量库并持久化
     try:
         store.add(all_chunks, vectors)
         store.save(settings.STORE_PATH)
-    except Exception:
+    except Exception as exc:
         logger.error("向量库写入失败", exc_info=True)
-        return False
+        return False, f"向量库写入失败：{exc.__class__.__name__}: {str(exc)[:200]}"
     # 同步写入 SQLite 向量块表
     try:
         for c in all_chunks:
@@ -117,10 +121,10 @@ def _ingest_chunks(conn, kb_id: int, all_chunks: list[dict], store: VectorStore)
                 (kb_id, c["text"], c["meta"]),
             )
         conn.commit()
-    except Exception:
+    except Exception as exc:
         logger.error("vector_chunks 落库失败", exc_info=True)
-        return False
-    return True
+        return False, f"vector_chunks 落库失败：{exc.__class__.__name__}: {str(exc)[:200]}"
+    return True, ""
 
 
 def ingest_local_path(master_id: int, kb_id: int, path_str: str, store: VectorStore) -> dict:
@@ -190,7 +194,7 @@ def ingest_local_path(master_id: int, kb_id: int, path_str: str, store: VectorSt
 
         conn.commit()
 
-        embedded = _ingest_chunks(conn, kb_id, all_chunks, store)
+        embedded, err = _ingest_chunks(conn, kb_id, all_chunks, store)
         msg = f"已摄入 {doc_count} 个文件，共 {len(all_chunks)} 个文本块"
         if skipped:
             msg += f"；跳过已存在 {skipped} 个"
@@ -198,6 +202,8 @@ def ingest_local_path(master_id: int, kb_id: int, path_str: str, store: VectorSt
             msg += f"；失败 {failed} 个"
         if not embedded:
             msg += "（注意：向量化失败，知识库元数据已存但暂不可检索）"
+            if err:
+                msg += f"——{err}"
         return {
             "success": True,
             "message": msg,
@@ -207,7 +213,8 @@ def ingest_local_path(master_id: int, kb_id: int, path_str: str, store: VectorSt
             "failed": failed,
         }
     finally:
-        conn.close()
+        # 不 close 连接（线程本地缓存复用），避免破坏缓存的连接导致 WAL 锁
+        pass
 
 
 def ingest_urls(master_id: int, kb_id: int, urls: list[str], store: VectorStore) -> dict:
@@ -276,7 +283,7 @@ def ingest_urls(master_id: int, kb_id: int, urls: list[str], store: VectorStore)
 
         conn.commit()
 
-        embedded = _ingest_chunks(conn, kb_id, all_chunks, store)
+        embedded, err = _ingest_chunks(conn, kb_id, all_chunks, store)
         msg = f"已抓取 {url_count} 个 URL，共 {len(all_chunks)} 个文本块"
         if skipped:
             msg += f"；跳过已存在 {skipped} 个"
@@ -284,6 +291,8 @@ def ingest_urls(master_id: int, kb_id: int, urls: list[str], store: VectorStore)
             msg += f"；失败 {failed} 个"
         if not embedded:
             msg += "（注意：向量化失败，知识库元数据已存但暂不可检索）"
+            if err:
+                msg += f"——{err}"
         return {
             "success": True,
             "message": msg,
@@ -293,7 +302,8 @@ def ingest_urls(master_id: int, kb_id: int, urls: list[str], store: VectorStore)
             "failed": failed,
         }
     finally:
-        conn.close()
+        # 不 close 连接（线程本地缓存复用），避免破坏缓存的连接导致 WAL 锁
+        pass
 
 
 def _fetch_url_text(url: str) -> str | None:
@@ -330,7 +340,8 @@ def get_kb_texts(kb_id: int) -> str:
         ).fetchall()
         return "\n\n".join(d["raw_text"] for d in docs)
     finally:
-        conn.close()
+        # 不 close 连接（线程本地缓存复用），避免破坏缓存的连接导致 WAL 锁
+        pass
 
 
 def get_or_create_kb(master_id: int) -> dict:
@@ -353,4 +364,5 @@ def get_or_create_kb(master_id: int) -> dict:
             ).fetchone()
         )
     finally:
-        conn.close()
+        # 不 close 连接（线程本地缓存复用），避免破坏缓存的连接导致 WAL 锁
+        pass

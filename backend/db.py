@@ -18,10 +18,12 @@ def get_db_path() -> Path:
 
 
 def get_conn() -> sqlite3.Connection:
-    conn = sqlite3.connect(str(get_db_path()), check_same_thread=False)
+    conn = sqlite3.connect(str(get_db_path()), check_same_thread=False, timeout=30)
     conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("PRAGMA journal_mode=DELETE")  # DELETE 模式比 WAL 更适合多连接场景
     conn.execute("PRAGMA foreign_keys=ON")
+    conn.execute("PRAGMA busy_timeout=10000")
+    conn.execute("PRAGMA synchronous=NORMAL")
     return conn
 
 
@@ -36,20 +38,6 @@ def init_db():
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)""")
     if not conn.execute("SELECT id FROM companies WHERE id=1").fetchone():
         conn.execute("INSERT INTO companies (id, name) VALUES (1, 'ThunderSoft')")
-
-    # 备份旧用户数据
-    old_users = _backup_old_users(conn)
-
-    # 删除依赖 users 的旧表
-    for t in ['users', 'knowledge_bases', 'kb_documents', 'kb_sources',
-              'dimensions', 'knowledge_points', 'assessments', 'assessment_questions',
-              'assessment_answers', 'mastery', 'study_plans', 'plan_days', 'plan_tasks',
-              'daily_reviews', 'review_questions', 'chat_history', 'vector_chunks',
-              'departments', 'courses', 'plans', 'plan_items', 'quizzes',
-              'daily_progress', 'company_posts', 'post_comments', 'post_likes',
-              'post_attachments', 'notifications', 'admin_logs', 'password_resets',
-              'login_attempts']:
-        conn.execute(f"DROP TABLE IF EXISTS {t}")
 
     # === 用户表（V2 完整） ===
     conn.execute("""CREATE TABLE IF NOT EXISTS users (
@@ -68,9 +56,6 @@ def init_db():
         approved_by INTEGER,
         approved_at TIMESTAMP,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)""")
-
-    # 恢复旧用户
-    _restore_old_users(conn, old_users)
 
     # === 知识库 ===
     conn.execute("""CREATE TABLE IF NOT EXISTS knowledge_bases (
@@ -179,7 +164,11 @@ def init_db():
     conn.execute("""CREATE TABLE IF NOT EXISTS plans (
         id INTEGER PRIMARY KEY AUTOINCREMENT, apprentice_id INTEGER NOT NULL,
         master_id INTEGER NOT NULL, company_id INTEGER NOT NULL DEFAULT 1,
-        name TEXT NOT NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)""")
+        name TEXT NOT NULL,
+        completed_at TIMESTAMP,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)""")
+    # P0 登记（2026-08-05）：plans.completed_at 列由 P1 固化进 schema；
+    # P6 之前在运行期懒建 ALTER，现统一由 init_db 保证，杜绝多连接 ALTER 隐患。
 
     conn.execute("""CREATE TABLE IF NOT EXISTS plan_items (
         id INTEGER PRIMARY KEY AUTOINCREMENT, plan_id INTEGER NOT NULL,
@@ -247,27 +236,30 @@ def init_db():
         id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL,
         attempted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, success INTEGER DEFAULT 0)""")
 
+    # === P0 登记（2026-08-05）：course_questions 表由 P1 固化进 schema ===
+    # 之前 P6 在运行期懒建，多连接场景可能错失；现由 init_db 统一建好。
+    conn.execute("""CREATE TABLE IF NOT EXISTS course_questions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        course_id INTEGER NOT NULL,
+        question TEXT NOT NULL,
+        qtype TEXT NOT NULL DEFAULT 'short' CHECK(qtype IN ('choice','short')),
+        answer_key TEXT,
+        options TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)""")
+
+    # === P0 登记：幂等 ALTER，兼容尚未升级的旧数据库 ===
+    # 已有库在初版 init_db 里没有 plans.completed_at / 无 course_questions；
+    # 这里用 PRAGMA 探测，缺则 ALTER/CREATE，不重复执行会报错。
+    def _has_column(table: str, column: str) -> bool:
+        rows = conn.execute(f"PRAGMA table_info({table})").fetchall()
+        return any(r["name"] == column for r in rows)
+
+    if not _has_column("plans", "completed_at"):
+        try:
+            conn.execute("ALTER TABLE plans ADD COLUMN completed_at TIMESTAMP")
+        except Exception:
+            pass  # 已被上方 CREATE TABLE 覆盖
+
     conn.execute("PRAGMA foreign_keys=ON")
     conn.commit()
     return conn
-
-
-def _backup_old_users(conn):
-    """备份旧 users 表数据"""
-    if conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='users'").fetchone():
-        rows = conn.execute("SELECT * FROM users").fetchall()
-        return [dict(r) for r in rows]
-    return []
-
-
-def _restore_old_users(conn, old_users):
-    """将旧用户数据恢复到新表"""
-    for u in old_users:
-        try:
-            conn.execute(
-                """INSERT INTO users (id, username, password_hash, role, master_id, company_id, status, created_at)
-                   VALUES (?, ?, ?, ?, ?, COALESCE(?, 1), 'approved', ?)""",
-                (u['id'], u['username'], u['password_hash'], u['role'],
-                 u.get('master_id'), u.get('company_id', 1), u.get('created_at')))
-        except:
-            pass

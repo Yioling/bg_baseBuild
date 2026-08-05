@@ -5,13 +5,8 @@ from datetime import datetime
 from backend.db import get_conn
 
 
-# ---------- P1 添加通知占位（等待 P7 合并） ----------
-try:
-    from modules.notification import notify
-except ImportError:
-    def notify(*args, **kwargs):
-        print(f"📢 [P1占位通知] 参数: {args} {kwargs}")
-        return True
+# ---------- P1 接入 P7 通知模块 ----------
+from backend.notifications import notify_register_pending
 
 
 # 简单的基于 token 的鉴权（无需 JWT 库依赖）
@@ -52,6 +47,15 @@ def register(username: str, password: str, role: str, master_id: int | None = No
              full_name: str | None = None, status: str = "pending") -> dict:
     """注册新用户（默认待审核）。返回 {success, message, user?}。"""
     conn = get_conn()
+
+    # 如果指定了师傅但未指定公司，从师傅继承 company_id
+    if company_id is None and master_id is not None:
+        master = conn.execute(
+            "SELECT company_id FROM users WHERE id=?", (master_id,)
+        ).fetchone()
+        if master:
+            company_id = master["company_id"]
+
     try:
         pwh = hash_password(password)
         cur = conn.execute(
@@ -66,25 +70,33 @@ def register(username: str, password: str, role: str, master_id: int | None = No
         uid = cur.lastrowid
 
 
-        # ===== P1 新增：注册待审通知（PO需求） =====
+        # ===== 注册待审通知：通知本公司全部已批准管理员 =====
+        # 重要：通知必须发在 conn.close() 之前或独立连接完成，不能复用即将关闭的 conn。
+        # 下面采用：先查 admin_ids（复用事务内连接），再传 None 让 notify 模块自取连接并提交，
+        # 避免“连接被关闭后再 execute”的报错，同时也避免跨连接事务隔离问题。
+        admin_ids = []
         try:
-            # 这里的 notify 已经在文件顶部导入（或占位）
-            notify(
-                conn=conn,
-                recipient_role='admin',
-                content=f'新用户 {username} 注册待审核',
-                related_id=uid
-            )
+            rows = conn.execute(
+                "SELECT id FROM users WHERE role='admin' AND company_id=? AND status='approved'",
+                (company_id or 1,)
+            ).fetchall()
+            admin_ids = [a["id"] for a in rows]
         except Exception as e:
-            # 通知失败不能影响注册主流程，只打印日志
-            print(f"注册通知发送异常（不影响主流程）: {e}")
-
+            print(f"查管理员列表异常（不影响主流程）: {e}")
+        conn.close()
+        if admin_ids:
+            try:
+                notify_register_pending(admin_ids, username=username, conn=None,
+                                        company_id=company_id or 1)
+            except Exception as e:
+                print(f"注册通知发送异常（不影响主流程）: {e}")
         return {"success": True, "message": "注册成功，等待公司管理员审核",
                 "user": {"id": uid, "username": username, "role": role, "status": status}}
     except Exception as e:
-        return {"success": True, "message": "注册成功，等待公司管理员审核",
-                "user": {"id": uid, "username": username, "role": role, "status": status}}
-    except Exception as e:
+        try:
+            conn.close()
+        except Exception:
+            pass
         if "UNIQUE" in str(e):
             return {"success": False, "message": "用户名已存在"}
         return {"success": False, "message": str(e)}
@@ -93,23 +105,26 @@ def register(username: str, password: str, role: str, master_id: int | None = No
 def login(username: str, password: str) -> dict:
     """登录。返回 {success, message, token?, user?}。"""
     conn = get_conn()
-    row = conn.execute("SELECT * FROM users WHERE username = ?", (username,)).fetchone()
-    if not row:
-        return {"success": False, "message": "用户名不存在"}
-    if not verify_password(password, row["password_hash"]):
-        return {"success": False, "message": "密码错误"}
-    if row["status"] == "pending":
-        return {"success": False, "message": "账号正在审核中，请等待公司管理员通过"}
-    if row["status"] == "rejected":
-        return {"success": False, "message": "账号未通过审核，请联系公司管理员"}
-    token = secrets.token_hex(32)
-    _tokens[token] = _user_info(row)
-    return {
-        "success": True,
-        "message": "登录成功",
-        "token": token,
-        "user": _user_info(row),
-    }
+    try:
+        row = conn.execute("SELECT * FROM users WHERE username = ?", (username,)).fetchone()
+        if not row:
+            return {"success": False, "message": "用户名不存在"}
+        if not verify_password(password, row["password_hash"]):
+            return {"success": False, "message": "密码错误"}
+        if row["status"] == "pending":
+            return {"success": False, "message": "账号正在审核中，请等待公司管理员通过"}
+        if row["status"] == "rejected":
+            return {"success": False, "message": "账号未通过审核，请联系公司管理员"}
+        token = secrets.token_hex(32)
+        _tokens[token] = _user_info(row)
+        return {
+            "success": True,
+            "message": "登录成功",
+            "token": token,
+            "user": _user_info(row),
+        }
+    finally:
+        conn.close()
 
 
 def get_user(token: str) -> dict | None:
@@ -176,16 +191,22 @@ def get_company_users(company_id: int) -> list:
         "FROM users WHERE company_id=? ORDER BY role, id",
         (company_id,),
     ).fetchall()
+
+    # 批量获取所有师傅姓名（避免 N+1 查询）
+    master_ids = {r["master_id"] for r in rows if r["role"] == "apprentice" and r["master_id"]}
+    master_map = {}
+    if master_ids:
+        placeholders = ",".join("?" * len(master_ids))
+        masters = conn.execute(
+            f"SELECT id, full_name, username FROM users WHERE id IN ({placeholders})",
+            tuple(master_ids),
+        ).fetchall()
+        master_map = {m["id"]: (m["full_name"] or m["username"]) for m in masters}
+
     out = []
     for r in rows:
         d = dict(r)
-        if r["role"] == "apprentice" and r["master_id"]:
-            m = conn.execute(
-                "SELECT full_name, username FROM users WHERE id=?", (r["master_id"],)
-            ).fetchone()
-            d["master_name"] = (m["full_name"] or m["username"]) if m else "-"
-        else:
-            d["master_name"] = "-"
+        d["master_name"] = master_map.get(r["master_id"], "-") if r["role"] == "apprentice" else "-"
         out.append(d)
     return out
 

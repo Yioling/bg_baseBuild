@@ -93,7 +93,11 @@
 | GET | `/api/notifications` | `{notifications,unread_count}` |
 | POST | `/api/notifications/read` | `{id?}` 标记已读 |
 
-> **内部函数**：`notify(conn, user_id, ntype, content, ref_id=None, company_id=1)`（当前在 main.py 内联）。**P7 将抽成 `backend/notifications.py` 的 `notify()`（含 SMTP 邮件），P1 在注册/检测提交等处调用。**
+> **内部函数**：`backend/notifications.notify(conn, user_id, ntype, content, ref_id=None, company_id=1)`（已抽模块，含 SMTP 邮件）。
+> **P1 已装配的自动触发**（P0 已就绪，2026-08-05）：
+> - `auth.register` 注册待审 → 通知本公司全部已批准管理员（type=`register_pending`）
+> - `api_submit_quiz` 徒弟提交检测 → 通知绑定师傅（type=`quiz_submitted`）
+> - 调用一律 `conn=None`，由通知模块自取连接 + commit，避免多连接事务隔离。
 
 ---
 
@@ -132,3 +136,15 @@
 4. **由 P1 在 `main.py` 写 `@app.xxx` 路由并 `from backend.xxx import func` 装配**，其余人不得改 `main.py`。
 
 > 任何人**不得**为了图方便直接在 `main.py` 里写业务逻辑或新建路由——这是合并冲突的头号来源。
+
+---
+
+## 十、账户安全 / 密码重置（P7 逻辑 + P1 装配，P0 已就绪）
+
+| 方法 | 路径 | 请求体 | 响应 |
+|------|------|--------|------|
+| POST | `/api/password/reset-request` | `{email}`（按 username / phone 定位） | `{success, token?, expiry?}` |
+| POST | `/api/password/reset` | `{token, new_password}` | `{success, message}` |
+
+> 逻辑在 `backend/account_security.py`（P7 拥有），P1 仅装配路由 + 引入 Pydantic 请求模型（`schemas.PasswordResetRequestReq` / `PasswordResetReq`）。
+> 路由调用模块时一律 `conn=None`，由模块自取连接 + commit，避免多连接事务隔离。

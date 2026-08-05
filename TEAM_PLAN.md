@@ -58,6 +58,9 @@ Windows 上双击/命令即可运行的 Web+桌面应用：师傅投喂资料→
 | P2 | 企微/钉钉/飞书 Webhook | P7（占位） | |
 | P2 | 交流圈附件上传 | P7 | 表 `post_attachments` 已有 |
 | P2 | @提醒 | P7 | |
+| P0 | course_questions 表懒建移入 db.py init_db | P1+P6 | P6 当前运行期懒建，需固化为 schema（2026-08-05 登记） |
+| P0 | plans.completed_at 列加入 db.py plans 表 | P1+P6 | 同上（2026-08-05 登记） |
+
 
 ## 6. 给每人 AI 编程助手的"开场纪律"（写进每个会话首条提示词）
 > "你只负责 **<Px 模块>** 的代码。严格遵守 `API_CONTRACT.md` 与 `TEAM_PLAN.md`：

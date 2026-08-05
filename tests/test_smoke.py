@@ -21,8 +21,7 @@ def test_register_login_smoke(client):
     reg = client.post("/api/register", json={
         "username": "smoke_test",
         "password": "123456",
-        "role": "master",
-        "email": "smoke@test.com"
+        "role": "master"
     })
     assert reg.status_code < 500
 
@@ -32,4 +31,4 @@ def test_register_login_smoke(client):
         "password": "123456"
     })
     assert login2.status_code == 200
-    assert "access_token" in login2.json()
+    assert "token" in login2.json()

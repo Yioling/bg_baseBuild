@@ -61,7 +61,7 @@ if __name__ == '__main__':
     if not conn.execute("SELECT id FROM users WHERE username='ts_master'").fetchone():
         conn.execute(
             "INSERT INTO users (username, password_hash, role, company_id, full_name, status, employee_no) "
-            "VALUES (?, ?, 'master', 1, '张师傅', 'approved', 'M001')",
+            "VALUES (?, ?, 'master', 1, '" "张师傅', 'approved', 'M001')",
             ('ts_master', hash_password('master123')))
     # 徒弟（绑定到师傅）
     if not conn.execute("SELECT id FROM users WHERE username='ts_apprentice'").fetchone():

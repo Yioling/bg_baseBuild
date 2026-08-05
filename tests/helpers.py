@@ -11,6 +11,9 @@ def make_user(
     conn, username, role, company_id=1, master_id=None,
     status="approved", full_name=None, department=None,
 ) -> int:
+    # P1 顺手收紧：插入前先清同 username 的遗留，避免跨测试 UNIQUE 冲突。
+    # 仅限测试裸表，不影响业务；轻微缓解 test_social 等的 setup-污染。
+    conn.execute("DELETE FROM users WHERE username=?", (username,))
     cur = conn.execute(
         "INSERT INTO users (username, password_hash, role, company_id, master_id, status, full_name, department) "
         "VALUES (?, 'hash', ?, ?, ?, ?, ?, ?)",

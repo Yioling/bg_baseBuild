@@ -315,7 +315,9 @@ class MasterPagesMixin:
                 cb = QCheckBox(f'{c["title"]}  [{c.get("type", "")}]')
                 self._course_checks.append((c["id"], cb))
                 course_area.addWidget(cb)
-        self._api_call("GET", f"{BASE_URL}/api/admin/courses", callback=fill_courses)
+        # P1 装配修正：原调 /api/admin/courses（需 admin 守卫，师傅会拿到 403），
+        # 改为 /api/master/courses（仅需登录 + 同公司隔离）。
+        self._api_call("GET", f"{BASE_URL}/api/master/courses", callback=fill_courses)
 
         def create_plan():
             aid = appr_combo.currentData()

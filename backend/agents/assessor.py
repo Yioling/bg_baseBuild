@@ -1,5 +1,6 @@
 """Assessor 测评智能体：出题 + 批改 + 定级。"""
 import json
+import re
 from backend.llm import chat_json, chat, use_mock
 from backend.db import get_conn
 
@@ -42,8 +43,117 @@ GRADE_SYSTEM = """你是一位严谨的阅卷官。对徒弟的作答进行批�
 - 无需展示过程，只输出 JSON"""
 
 
+def _local_grade(apprentice_answer: str, q_data: dict) -> dict:
+    """本地降级评分（LLM 返空时）。
+
+    评分逻辑：
+    - 选择题：拿答与 answer_key 比对，完全一致 100 / 否则 0
+    - 简答题：拆标准答案为关键词，按命中比例给分（最低 20 分保底）
+    - 输出反馈含标准答案 + 命中比例
+    """
+    answer = (apprentice_answer or "").strip()
+    key = (q_data.get("answer_key") or "").strip()
+    qtype = (q_data.get("qtype") or "short").lower()
+    if not answer:
+        return {
+            "score": 0,
+            "feedback": "未作答。请参考标准答案补充：\n" + (key or "(无标准答案)"),
+            "is_correct": False,
+        }
+    if qtype == "choice":
+        # answer 可能是 "A" / "A. xxx"，只取首字母
+        a_letter = answer[0].upper() if answer else ""
+        k_letter = (key[0].upper() if key else "")
+        ok = bool(k_letter) and a_letter == k_letter
+        return {
+            "score": 100 if ok else 0,
+            "feedback": ("选对啦：你的答案与标准选项一致。\n" if ok else "未选对：本题正确选项为 ")
+                       + (key or "(无标准答案)") + "。",
+            "is_correct": ok,
+        }
+    # 简答：关键词命中比例
+    keywords = [w for w in re.split(r"[，。；、 ,.\u3000]+", key) if len(w) >= 2] or [key]
+    if not keywords:
+        keywords = [key]
+    hit = sum(1 for w in keywords if w and w in answer)
+    pct = hit / max(1, len(keywords))
+    score = int(min(100, max(20, pct * 100)))
+    is_correct = score >= 60
+    fb_lines = [
+        f"（本地粗评：命中关键点 {hit}/{len(keywords)} = {int(pct*100)}%）",
+        f"参考标准答案：{key or '(无)'}",
+    ]
+    return {
+        "score": score,
+        "feedback": "\n".join(fb_lines),
+        "is_correct": is_correct,
+    }
+
+
+def _local_generate_questions(dims_list: list[dict]) -> list[dict]:
+    """本地降级出题：不依赖 LLM，基于师傅知识库的维度名/描述/知识点拼题。
+
+    P1 加：为在无 LLM / LLM 调用失败的环境也能出题。
+    - 每个维度出 3 题（易 / 中 / 难），完全基于 dimensions 表的内容，
+    - 选择题以 4 选项 + answer_key="A" 模拟起见（永远不会被“判定”为对），
+      重点是“选择型 1 题”加 2 道思考简答题。实际评分时若选了选项提示
+      “本地占位选项，请参考知识点表述作答”。
+    - 题目内容必须与师傅的知识库对齐，不编造。
+    """
+    out: list[dict] = []
+    for d in dims_list:
+        name = d["name"]
+        desc = (d.get("description") or "").strip()
+        pts = d.get("points") or []
+        pt_titles = [p.get("title", "") for p in pts if p.get("title")]
+        pt_blurb = "、".join(pt_titles[:3]) if pt_titles else ""
+        ctx = desc or pt_blurb or name
+        # 易 1：选项型 (无标准答案——以“选项作考点提示”逼学员在知识库中查)
+        q_easy = {
+            "dimension_name": name,
+            "question": f"【选择】下列哪一项最贴切地描述“{name}”？（请结合师傅知识库表述作答）",
+            "qtype": "choice",
+            "difficulty": "易",
+            "options": [
+                f"A. {name}的核心要点",
+                f"B. 与{name}无关的通用概念",
+                f"C. 其他模块的关联说明",
+                f"D. 以上都不是",
+            ],
+            "answer_key": "A",
+            "explanation": f"请参考维度描述：{ctx or name}",
+        }
+        # 中 1：简答
+        q_mid = {
+            "dimension_name": name,
+            "question": f"【简答】请用自己的话阐述“{name}”的关键内容（不少于 30 字）。",
+            "qtype": "short",
+            "difficulty": "中",
+            "options": None,
+            "answer_key": ctx or pt_blurb or name,
+            "explanation": f"关键点：{ctx or pt_blurb or name}",
+        }
+        # 难 1：应用题（从首个知识点截取为题干）
+        pt0 = pt_titles[0] if pt_titles else name
+        q_hard = {
+            "dimension_name": name,
+            "question": f"【应用】以“{pt0}”为背景，举例说明其在“{name}”中的实际应用。",
+            "qtype": "short",
+            "difficulty": "难",
+            "options": None,
+            "answer_key": f"应联系“{pt0}”与{name}：{ctx or pt_blurb}",
+            "explanation": f"参考答案：结合知识点“{pt0}”与维度描述作答。",
+        }
+        out.extend([q_easy, q_mid, q_hard])
+    return out
+
+
 def generate_assessment(apprentice_id: int, kb_id: int) -> dict:
-    """生成摸底考试题目。"""
+    """生成摸底考试题目。
+
+    优先调真实 LLM 出题；若 LLM 调用失败（连不上/超时/返空），自动降级到
+    本地模板出题（基于师傅维度与知识点内容拼题），保证始终能生成题目。
+    """
     conn = get_conn()
     dims = conn.execute(
         "SELECT d.* FROM dimensions d WHERE d.kb_id=? ORDER BY d.sort_order LIMIT 8",
@@ -67,8 +177,12 @@ def generate_assessment(apprentice_id: int, kb_id: int) -> dict:
     dims_json = json.dumps(dims_list, ensure_ascii=False, indent=2)
     result = chat_json(ASSESS_SYSTEM, f"请基于以下知识维度出摸底考试题：\n\n{dims_json}")
 
-    if not result or "questions" not in result:
-        return {"success": False, "message": "题目生成失败"}
+    # 降级：LLM 返空或无 questions 字段 → 本地模板出题
+    if not result or "questions" not in result or not result["questions"]:
+        result = {"questions": _local_generate_questions(dims_list)}
+        # 如果连维度都没有，仍无法出题，给出明确提示
+        if not result["questions"]:
+            return {"success": False, "message": "题目生成失败：知识库维度为空"}
 
     # 创建评估记录
     cur = conn.execute(
@@ -121,6 +235,9 @@ def grade_answer(question_id: int, apprentice_answer: str, assessment_id: int) -
     prompt = f"题目：{q_data['question']}\n题型：{q_data['qtype']}\n标准答案：{q_data['answer_key']}\n选项：{q_data['options'] or '无'}\n徒弟作答：{apprentice_answer}"
 
     result = chat_json(GRADE_SYSTEM, prompt)
+    # P1 降级：LLM 返空 → 按“关键点命中比例”本地粗评，保证徒弟提交后能拿到反馈
+    if not isinstance(result, dict) or "score" not in result:
+        result = _local_grade(apprentice_answer, q_data)
     score = result.get("score", 0) if isinstance(result, dict) else 0
     feedback = result.get("feedback", "") if isinstance(result, dict) else ""
     is_correct = result.get("is_correct", False) if isinstance(result, dict) else False
