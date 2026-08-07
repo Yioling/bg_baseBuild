@@ -2,6 +2,7 @@
 import json
 from pathlib import Path
 from fastapi import FastAPI, Request, HTTPException, Depends
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 import io
@@ -35,6 +36,15 @@ from backend.courses import (
 # 以下新增 /api/master/courses 给师傅使用（同一函数，不需 admin 守卫，仅同公司隔离）。
 
 app = FastAPI(title="薪火·师傅带徒 AI 导师系统", version="1.0.0")
+
+# CORS：允许局域网内其他电脑的桌面客户端访问
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 # ---------- P1 装配 P7 账户安全模块（密码重置 / 登录锁定） ----------

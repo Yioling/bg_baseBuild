@@ -14,3 +14,5 @@ trafilatura>=1.12
 beautifulsoup4>=4.12
 requests>=2.31
 PyQt5>=5.15
+# PostgreSQL 支持 (可选，仅在 DB_TYPE=postgres 时需要)
+psycopg[binary]>=3.1

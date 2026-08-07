@@ -9,6 +9,7 @@ UI 已拆分至 `ui/` 包：
 
 本文件仅保留：后端服务启动 + 应用启动流程（launch_desktop 供 run_exe.py 复用）。
 """
+import os
 import sys
 import threading
 import asyncio
@@ -31,7 +32,10 @@ def start_server():
 
     import uvicorn
     from backend.main import app
-    config = uvicorn.Config(app, host="127.0.0.1", port=SERVER_PORT, log_level="warning")
+    # 服务端监听地址：环境变量 SERVER_HOST 控制（默认 127.0.0.1）
+    # 服务端模式设为 0.0.0.0 可让局域网其他电脑连接
+    server_host = os.getenv("SERVER_HOST", "127.0.0.1")
+    config = uvicorn.Config(app, host=server_host, port=SERVER_PORT, log_level="warning")
     server = uvicorn.Server(config)
     loop.run_until_complete(server.serve())
 

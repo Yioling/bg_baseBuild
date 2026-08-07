@@ -12,7 +12,9 @@ import requests
 from PyQt5.QtCore import QThread, pyqtSignal
 
 SERVER_PORT = 8000
-BASE_URL = f"http://127.0.0.1:{SERVER_PORT}"
+# 支持环境变量 API_BASE 指定远程服务端地址（默认本机）
+# 例如: API_BASE=http://192.168.1.100:8000
+BASE_URL = os.getenv("API_BASE", f"http://127.0.0.1:{SERVER_PORT}")
 
 
 class ApiThread(QThread):
