@@ -59,6 +59,7 @@ QWidget#content {{
 QLabel {{
     font-size: 19px;
     color: {Color.TEXT};
+    background: transparent;
 }}
 QScrollArea {{
     border: none;
@@ -81,20 +82,20 @@ QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{
     height: 0;
 }}
 
-/* 主按钮 */
+/* 主按钮（红框红字白底，与投喂/AI 精炼按钮视觉一致） */
 QPushButton {{
-    background-color: {Color.PRIMARY};
-    color: white;
-    border: none;
+    background: {Color.SURFACE};
+    color: {Color.PRIMARY};
+    border: 1.5px solid {Color.PRIMARY};
     border-radius: {Radius.SM}px;
     padding: 16px 30px;
     font-size: 20px;
     font-weight: 600;
     min-height: 48px;
 }}
-QPushButton:hover {{ background-color: {Color.PRIMARY_HOVER}; }}
-QPushButton:pressed {{ background-color: {Color.PRIMARY_PRESSED}; }}
-QPushButton:disabled {{ background-color: #c8bcbc; }}
+QPushButton:hover {{ background: {Color.PRIMARY_SOFT}; }}
+QPushButton:pressed {{ border-color: {Color.PRIMARY_HOVER}; color: {Color.PRIMARY_HOVER}; }}
+QPushButton:disabled {{ color: #c8bcbc; border-color: #e0d4d4; }}
 
 QPushButton#btnSecondary {{
     background-color: {Color.SURFACE};
@@ -110,8 +111,8 @@ QPushButton#btnGhost {{
     font-size: 20px;
 }}
 QPushButton#btnGhost:hover {{ color: {Color.PRIMARY_HOVER}; }}
-QPushButton#btnSuccess {{ background-color: {Color.SUCCESS}; }}
-QPushButton#btnSuccess:hover {{ background-color: #059669; }}
+QPushButton#btnSuccess {{ background: {Color.SURFACE}; color: {Color.PRIMARY}; border: 1.5px solid {Color.PRIMARY}; }}
+QPushButton#btnSuccess:hover {{ background: {Color.PRIMARY_SOFT}; }}
 QPushButton#btnDanger {{ background-color: #991b1b; }}
 QPushButton#btnDanger:hover {{ background-color: #7f1616; }}
 
@@ -139,9 +140,9 @@ QComboBox QAbstractItemView {{
 }}
 
 /* 文字标题 */
-QLabel#pageTitle {{ font-size: 35px; font-weight: 800; color: {Color.TEXT}; }}
-QLabel#pageSubtitle {{ font-size: 20.5px; color: {Color.TEXT_SUB}; }}
-QLabel#sectionTitle {{ font-size: 23px; font-weight: 700; color: #2b2323; }}
+QLabel#pageTitle {{ font-size: 35px; font-weight: 800; color: {Color.TEXT}; background: transparent; }}
+QLabel#pageSubtitle {{ font-size: 20.5px; color: {Color.TEXT_SUB}; background: transparent; }}
+QLabel#sectionTitle {{ font-size: 23px; font-weight: 700; color: #2b2323; background: transparent; }}
 
 /* 表格 */
 QTableWidget {{
@@ -250,10 +251,25 @@ QLabel#logoSub {{
     font-size: 17.5px;
     padding: 0 32px 16px 32px;
 }}
-QLabel#userinfo {{
+QWidget#userinfo {{
+    background: transparent;
+}}
+QLabel#userAvatar {{
     color: #f0c4c4;
-    font-size: 18.5px;
-    padding: 12px 32px;
+    font-size: 26px;
+    background: transparent;
+}}
+QLabel#userName {{
+    color: #ffffff;
+    font-size: 24px;
+    font-weight: 700;
+    background: transparent;
+}}
+QLabel#userRole {{
+    color: #f0c4c4;
+    font-size: 19px;
+    font-weight: 500;
+    background: transparent;
 }}
 """
 
@@ -282,21 +298,97 @@ def card(accent: str = None, padding: int = 26) -> QFrame:
     return f
 
 
-def stat_card(value: str, label: str, color: str = Color.PRIMARY) -> QFrame:
-    """指标卡：大数字 + 说明文字。"""
+def _hex_alpha(hex_color: str, ratio: float, base: str = "#ffffff") -> str:
+    """把 hex_color 以 ratio 比例混合到 base 上，返回 hex 串（用于淡色选中底）。"""
+    try:
+        c, b = hex_color.lstrip("#"), base.lstrip("#")
+        if len(c) != 6 or len(b) != 6:
+            return base
+        mix = [
+            round(int(b[i:i + 2], 16) * (1 - ratio) + int(c[i:i + 2], 16) * ratio)
+            for i in (0, 2, 4)
+        ]
+        return "#{:02x}{:02x}{:02x}".format(*mix)
+    except (ValueError, TypeError):
+        return base
+
+
+def _stat_card_qss(color: str, border_px: int = 4, bg: str = None) -> str:
+    """生成指标卡 QFrame 样式串（仅作用于 QFrame，不作用于 QLayout）。"""
+    return (
+        f"QFrame#card{{background:{bg or Color.SURFACE};"
+        f"border:1px solid {Color.BORDER};border-radius:{Radius.LG}px;"
+        f"padding:28px;border-left:{border_px}px solid {color};}}"
+    )
+
+
+def stat_card(value: str, label: str, color: str = Color.PRIMARY,
+              clickable: bool = False, on_click=None) -> QFrame:
+    """指标卡：大数字 + 说明文字。
+
+    clickable=True 时卡片可点击：手型光标、右下角 ▸ 提示、悬停/选中态。
+    卡片额外挂载 set_selected(bool) 方法供调用方做互斥控制。
+    """
     f = card(accent=color, padding=28)
     lay = QVBoxLayout(f)
     lay.setContentsMargins(8, 8, 8, 8)
     lay.setSpacing(8)
     v = QLabel(str(value))
-    v.setStyleSheet(f"font-size:43px;font-weight:800;color:{color};")
+    v.setStyleSheet(
+        f"font-size:43px;font-weight:800;color:{color};background:transparent;"
+    )
     v.setAlignment(Qt.AlignCenter)
     lay.addWidget(v)
     l = QLabel(label)
-    l.setStyleSheet(f"font-size:20px;color:{Color.TEXT_SUB};font-weight:500;")
+    l.setStyleSheet(
+        f"font-size:20px;color:{Color.TEXT_SUB};font-weight:500;background:transparent;"
+    )
     l.setAlignment(Qt.AlignCenter)
     lay.addWidget(l)
     apply_shadow(f, blur=18, dy=4, alpha=18)
+
+    if not clickable:
+        return f
+
+    # ---- 可交互卡片 ----
+    hint = QLabel("▸")
+    hint.setStyleSheet(
+        f"font-size:14px;color:{Color.TEXT_SUB};background:transparent;"
+    )
+    hint.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+    lay.addWidget(hint)
+
+    f.setCursor(Qt.PointingHandCursor)
+    f._selected = False
+    sel_bg = _hex_alpha(color, 0.08)
+
+    def _restyle():
+        if f._selected:
+            f.setStyleSheet(_stat_card_qss(color, 6, sel_bg))
+            apply_shadow(f, blur=26, dy=6, alpha=32)
+        else:
+            f.setStyleSheet(_stat_card_qss(color, 4))
+            apply_shadow(f, blur=18, dy=4, alpha=18)
+
+    def set_selected(state: bool):
+        f._selected = bool(state)
+        _restyle()
+
+    f.set_selected = set_selected
+
+    def _enter(_e):
+        if not f._selected:
+            f.setStyleSheet(_stat_card_qss(color, 6))
+            apply_shadow(f, blur=26, dy=6, alpha=32)
+
+    def _leave(_e):
+        if not f._selected:
+            _restyle()
+
+    f.enterEvent = _enter
+    f.leaveEvent = _leave
+    if on_click:
+        f.mousePressEvent = lambda _e: on_click()
     return f
 
 
@@ -321,7 +413,27 @@ def section_label(text: str) -> QLabel:
 
 def hint_label(text: str, color: str = Color.TEXT_SUB) -> QLabel:
     l = QLabel(text)
-    l.setStyleSheet(f"color:{color};font-size:19px;")
+    l.setStyleSheet(f"color:{color};font-size:19px;background:transparent;")
+    l.setWordWrap(True)
+    return l
+
+
+#: 引导卡（"🚀 带徒五步法" / "🚀 新手上路"）标题样式，供 GroupBox 单独覆写
+GUIDE_BOX_TITLE_QSS = (
+    f"QGroupBox{{font-size:25px;font-weight:700;color:{Color.TEXT};"
+    f"border:1px solid {Color.BORDER};border-radius:{Radius.LG}px;"
+    f"margin-top:16px;padding:22px 20px 20px 20px;background:{Color.SURFACE};}}"
+    "QGroupBox::title{subcontrol-origin:margin;left:18px;padding:0 8px;}"
+)
+
+
+def guide_item(text: str, color: str = Color.TEXT) -> QLabel:
+    """引导卡条目：比 hint_label 更大的字号，专供引导卡使用。"""
+    l = QLabel(text)
+    l.setStyleSheet(
+        f"color:{color};font-size:24px;font-weight:500;"
+        "padding-left:6px;background:transparent;"
+    )
     l.setWordWrap(True)
     return l
 
@@ -375,6 +487,32 @@ def ingest_button(text: str) -> QPushButton:
     return b
 
 
+def refine_button(text: str) -> QPushButton:
+    """AI 精炼触发按钮：白底 + 红框 + 红字（与投喂按钮视觉一致，强调一次性重要动作）。
+
+    返回 QPushButton（QWidget 子类），样式仅作用于自身，遵守铁律。
+    """
+    b = QPushButton(text)
+    b.setObjectName("btnRefine")
+    b.setCursor(Qt.PointingHandCursor)
+    b.setStyleSheet(
+        "QPushButton#btnRefine{"
+        f"background:{Color.SURFACE};"
+        f"color:{Color.PRIMARY};"
+        f"border:1.5px solid {Color.PRIMARY};"
+        f"border-radius:{Radius.SM}px;"
+        "padding:16px 30px;"
+        "min-height:48px;"
+        "font-size:20px;"
+        "font-weight:600;"
+        "}"
+        f"QPushButton#btnRefine:hover{{background:{Color.PRIMARY_SOFT};}}"
+        f"QPushButton#btnRefine:pressed{{border-color:{Color.PRIMARY_HOVER};color:{Color.PRIMARY_HOVER};}}"
+        "QPushButton#btnRefine:disabled{color:#c8bcbc;border-color:#e0d4d4;}"
+    )
+    return b
+
+
 def success_button(text: str) -> QPushButton:
     b = QPushButton(text)
     b.setObjectName("btnSuccess")
@@ -398,14 +536,14 @@ def ghost_button(text: str) -> QPushButton:
 
 def loading_label(text: str = "加载中...") -> QLabel:
     l = QLabel(f"⏳ {text}")
-    l.setStyleSheet(f"color:{Color.TEXT_SUB};font-size:21px;padding:28px;")
+    l.setStyleSheet(f"color:{Color.TEXT_SUB};font-size:21px;padding:28px;background:transparent;")
     l.setAlignment(Qt.AlignCenter)
     return l
 
 
 def empty_label(text: str = "暂无数据") -> QLabel:
     l = QLabel(f"🗂  {text}")
-    l.setStyleSheet(f"color:{Color.TEXT_MUTED};font-size:21px;padding:32px;")
+    l.setStyleSheet(f"color:{Color.TEXT_MUTED};font-size:21px;padding:32px;background:transparent;")
     l.setAlignment(Qt.AlignCenter)
     return l
 

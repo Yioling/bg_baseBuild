@@ -24,18 +24,18 @@ if _fh is not None:
     logging.getLogger().addHandler(_fh)
 
 from PyQt5.QtWidgets import (
-    QVBoxLayout, QHBoxLayout, QGridLayout, QLabel, QLineEdit, QTextEdit,
+    QWidget, QVBoxLayout, QHBoxLayout, QGridLayout, QLabel, QLineEdit, QTextEdit,
     QPushButton, QGroupBox, QComboBox, QCheckBox, QProgressBar, QFrame,
     QTableWidget, QTableWidgetItem, QHeaderView, QMessageBox, QDoubleSpinBox,
-    QFileDialog, QAbstractItemView,
+    QFileDialog, QAbstractItemView, QScrollArea, QApplication,
 )
 from PyQt5.QtCore import Qt, QMimeData, QUrl
 
 from ui.api import BASE_URL
 from ui.theme import (
     Color, card, stat_card, section_label, hint_label, loading_label,
-    empty_label, primary_button, success_button, secondary_button, badge,
-    apply_shadow, ingest_button,
+    empty_label, primary_button, success_button, secondary_button, badge, refine_button,
+    apply_shadow, ingest_button, guide_item, GUIDE_BOX_TITLE_QSS,
 )
 
 
@@ -46,30 +46,72 @@ class MasterPagesMixin:
         layout.addWidget(loading)
 
         def on_knowledge(res):
-            dim_count = len(res.get("dimensions", [])) if res.get("success") else 0
-            pt_count = sum(len(d.get("points", [])) for d in res.get("dimensions", [])) \
-                if res.get("success") else 0
+            dims = res.get("dimensions", []) if res.get("success") else []
+            self._ov_dims = dims
+            dim_count = len(dims)
+            pt_count = sum(len(d.get("points", [])) for d in dims)
             self._api_call("GET", f"{BASE_URL}/api/master/apprentices",
                            callback=lambda r: on_appr(r, dim_count, pt_count))
 
         def on_appr(res, dim_count, pt_count):
             loading.hide()
             app_count = len(res.get("apprentices", [])) if res.get("success") else 0
+            self._ov_apprs = res.get("apprentices", []) if res.get("success") else []
+
+            # ---- 概览详情区（先建，供卡片回调引用）----
+            detail = card()
+            detail_lay = QVBoxLayout(detail)
+            detail_lay.setContentsMargins(4, 4, 4, 4)
+            detail_lay.setSpacing(12)
+            detail_scroll = QScrollArea()
+            detail_scroll.setWidgetResizable(True)
+            detail_scroll.setFrameShape(QFrame.NoFrame)
+            detail_scroll.setWidget(detail)
+            avail = QApplication.desktop().availableGeometry().height()
+            detail_scroll.setFixedHeight(max(300, min(460, int(avail * 0.34))))
+
+            self._ov_cards = {}
+
+            def show_detail(key):
+                for k, c in self._ov_cards.items():
+                    c.set_selected(k == key)
+                while detail_lay.count():
+                    item = detail_lay.takeAt(0)
+                    w = item.widget()
+                    if w is not None:
+                        w.setParent(None)
+                builder = {
+                    "dims": self._ov_chart_dimensions,
+                    "points": self._ov_chart_points,
+                    "apprs": self._ov_chart_apprentices,
+                }[key]
+                builder(detail_lay)
+
             grid = QGridLayout()
             grid.setSpacing(14)
             cards = [
-                (dim_count, "知识维度", Color.PRIMARY),
-                (pt_count, "知识点", Color.SUCCESS),
-                (app_count, "徒弟数量", Color.WARNING),
-                ("v2.0", "桌面版本", Color.DANGER),
+                (dim_count, "知识维度", Color.PRIMARY, "dims"),
+                (pt_count, "知识点", Color.SUCCESS, "points"),
+                (app_count, "徒弟数量", Color.WARNING, "apprs"),
+                ("v2.0", "桌面版本", Color.DANGER, None),
             ]
-            for i, (val, lbl, color) in enumerate(cards):
-                grid.addWidget(stat_card(val, lbl, color), 0, i)
+            for i, (val, lbl, color, key) in enumerate(cards):
+                if key is None:
+                    grid.addWidget(stat_card(val, lbl, color), 0, i)
+                else:
+                    c = stat_card(val, lbl, color, clickable=True,
+                                  on_click=lambda k=key: show_detail(k))
+                    self._ov_cards[key] = c
+                    grid.addWidget(c, 0, i)
             layout.addLayout(grid)
+            layout.addWidget(detail_scroll)
+
+            show_detail("dims")
 
             guide = QGroupBox("🚀 带徒五步法")
+            guide.setStyleSheet(GUIDE_BOX_TITLE_QSS)
             gl = QVBoxLayout(guide)
-            gl.setSpacing(8)
+            gl.setSpacing(14)
             for s in [
                 "1. 投喂资料 → 上传本地文档或博客 URL",
                 "2. AI 精炼 → 自动生成知识维度与考点树",
@@ -77,10 +119,124 @@ class MasterPagesMixin:
                 "4. 生成计划 → AI 自动排课或定制培养计划",
                 "5. 学情看板 → 追踪徒弟学习进展并批改检测",
             ]:
-                gl.addWidget(hint_label(s, Color.TEXT))
+                gl.addWidget(guide_item(s))
             layout.addWidget(guide)
+            layout.addStretch(1)
 
         self._api_call("GET", f"{BASE_URL}/api/master/knowledge", callback=on_knowledge)
+
+    # ---------- 概览三种图形（均使用首屏缓存，不再发请求） ----------
+    def _ov_chart_dimensions(self, lay):
+        dims = getattr(self, "_ov_dims", []) or []
+        total_pt = sum(len(d.get("points", [])) for d in dims)
+        lay.addWidget(section_label(
+            f"📚 知识维度分布 (共 {len(dims)} 个维度 / {total_pt} 个知识点)"))
+        if not dims:
+            lay.addWidget(empty_label("暂无知识维度，前往 📁 投喂资料 添加"))
+            return
+        ordered = sorted(dims, key=lambda d: len(d.get("points", [])), reverse=True)
+        top = ordered[:10]
+        max_pt = max(len(d.get("points", [])) for d in top) or 1
+        for d in top:
+            n = len(d.get("points", []))
+            row = QWidget()
+            rl = QHBoxLayout(row)
+            rl.setContentsMargins(0, 0, 0, 0)
+            rl.setSpacing(12)
+            name = QLabel(d.get("name", "未命名"))
+            name.setStyleSheet(
+                f"font-size:19px;color:{Color.TEXT};background:transparent;")
+            name.setFixedWidth(220)
+            name.setWordWrap(True)
+            rl.addWidget(name)
+            bar = QProgressBar()
+            bar.setMaximum(max_pt)
+            bar.setValue(n)
+            bar.setTextVisible(False)
+            bar.setFixedHeight(20)
+            rl.addWidget(bar, 1)
+            cnt = QLabel(str(n))
+            cnt.setStyleSheet(
+                f"font-size:19px;font-weight:700;color:{Color.PRIMARY};"
+                "background:transparent;")
+            cnt.setFixedWidth(48)
+            cnt.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+            rl.addWidget(cnt)
+            lay.addWidget(row)
+        if len(ordered) > 10:
+            lay.addWidget(hint_label(f"其余 {len(ordered) - 10} 个维度未显示"))
+
+    def _ov_chart_points(self, lay):
+        dims = getattr(self, "_ov_dims", []) or []
+        total_pt = sum(len(d.get("points", [])) for d in dims)
+        lay.addWidget(section_label(f"🧩 知识点总览 ({total_pt} 个)"))
+        if total_pt == 0:
+            lay.addWidget(empty_label("暂无知识点，前往 📁 投喂资料 添加"))
+            return
+        inner = QWidget()
+        il = QVBoxLayout(inner)
+        il.setContentsMargins(0, 0, 0, 0)
+        il.setSpacing(10)
+        shown = 0
+        for d in dims:
+            pts = d.get("points", [])
+            if not pts or shown >= 60:
+                continue
+            il.addWidget(hint_label(f"{d.get('name', '未命名')} ({len(pts)})", Color.TEXT))
+            wrap = QWidget()
+            wl = QGridLayout(wrap)
+            wl.setContentsMargins(0, 0, 0, 0)
+            wl.setSpacing(8)
+            col = 0
+            row_i = 0
+            for p in pts:
+                if shown >= 60:
+                    break
+                pname = p.get("name", str(p)) if isinstance(p, dict) else str(p)
+                wl.addWidget(badge(pname, Color.SUCCESS, Color.SUCCESS_SOFT), row_i, col)
+                shown += 1
+                col += 1
+                if col >= 5:
+                    col = 0
+                    row_i += 1
+            il.addWidget(wrap)
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.NoFrame)
+        scroll.setMinimumHeight(260)
+        scroll.setWidget(inner)
+        lay.addWidget(scroll)
+        if total_pt > shown:
+            lay.addWidget(hint_label(f"其余 {total_pt - shown} 个知识点未显示"))
+
+    def _ov_chart_apprentices(self, lay):
+        apprs = getattr(self, "_ov_apprs", []) or []
+        lay.addWidget(section_label(f"👥 徒弟概览 (共 {len(apprs)} 人)"))
+        if not apprs:
+            lay.addWidget(empty_label("暂无徒弟，前往 👥 徒弟管理 创建"))
+            return
+        wrap = QWidget()
+        wl = QGridLayout(wrap)
+        wl.setContentsMargins(0, 0, 0, 0)
+        wl.setSpacing(12)
+        for i, a in enumerate(apprs):
+            name = a.get("full_name") or a.get("username", "未命名")
+            status = a.get("status", "")
+            c = card(accent=Color.WARNING, padding=18)
+            cl = QVBoxLayout(c)
+            cl.setContentsMargins(6, 6, 6, 6)
+            cl.setSpacing(8)
+            n = QLabel(f"👤 {name}")
+            n.setStyleSheet(
+                f"font-size:20px;font-weight:700;color:{Color.TEXT};"
+                "background:transparent;")
+            cl.addWidget(n)
+            if status == "active":
+                cl.addWidget(badge("已激活", Color.SUCCESS, Color.SUCCESS_SOFT))
+            else:
+                cl.addWidget(badge("待激活", Color.WARNING, Color.WARNING_SOFT))
+            wl.addWidget(c, i // 3, i % 3)
+        lay.addWidget(wrap)
 
     # ==================== 投喂资料 ====================
     def _build_master_ingest(self, layout, container):
@@ -167,7 +323,7 @@ class MasterPagesMixin:
     # ==================== 知识库 ====================
     def _build_master_knowledge(self, layout, container):
         top = QHBoxLayout()
-        refine_btn = success_button("🧪 触发 AI 精炼")
+        refine_btn = refine_button("🧪 触发 AI 精炼")
         top.addWidget(refine_btn)
         top.addWidget(hint_label("投喂资料后点击，AI 自动生成知识维度与考点树"))
         top.addStretch()
@@ -193,16 +349,16 @@ class MasterPagesMixin:
                 dl = QVBoxLayout(df)
                 dl.setSpacing(6)
                 name = QLabel(d.get("name", ""))
-                name.setStyleSheet(f"font-weight:700;font-size:21px;color:{Color.TEXT};")
+                name.setStyleSheet(f"font-weight:700;font-size:21px;color:{Color.TEXT};background:transparent;")
                 dl.addWidget(name)
                 if d.get("description"):
                     desc = QLabel(d["description"])
-                    desc.setStyleSheet(f"color:{Color.TEXT_SUB};font-size:19px;")
+                    desc.setStyleSheet(f"color:{Color.TEXT_SUB};font-size:19px;background:transparent;")
                     desc.setWordWrap(True)
                     dl.addWidget(desc)
                 for p in d.get("points", []):
                     row = QLabel(f'· {p.get("title", "")}  [{p.get("level", "")}]')
-                    row.setStyleSheet(f"color:{Color.TEXT};font-size:19.5px;padding-left:6px;")
+                    row.setStyleSheet(f"color:{Color.TEXT};font-size:19.5px;padding-left:6px;background:transparent;")
                     dl.addWidget(row)
                 result_area.addWidget(df)
 
@@ -348,11 +504,11 @@ class MasterPagesMixin:
                 pf = card(padding=12)
                 pl = QHBoxLayout(pf)
                 name = QLabel(f'{p["name"]}  →  {p.get("apprentice_name", "")}')
-                name.setStyleSheet(f"font-weight:600;color:{Color.TEXT};font-size:20px;")
+                name.setStyleSheet(f"font-weight:600;color:{Color.TEXT};font-size:20px;background:transparent;")
                 pl.addWidget(name)
                 pl.addStretch()
                 t = QLabel(str(p.get("created_at", ""))[:16])
-                t.setStyleSheet(f"color:{Color.TEXT_MUTED};font-size:18px;")
+                t.setStyleSheet(f"color:{Color.TEXT_MUTED};font-size:18px;background:transparent;")
                 pl.addWidget(t)
                 layout.addWidget(pf)
 
@@ -397,7 +553,7 @@ class MasterPagesMixin:
                 ql.setSpacing(6)
                 head = QHBoxLayout()
                 title = QLabel(q.get("course_title") or f'任务 #{q.get("plan_item_id", "")}')
-                title.setStyleSheet(f"font-weight:700;color:{Color.TEXT};font-size:20px;")
+                title.setStyleSheet(f"font-weight:700;color:{Color.TEXT};font-size:20px;background:transparent;")
                 head.addWidget(title)
                 head.addWidget(badge(f'第{q.get("attempt", 1)}次',
                                      Color.INFO, "#e0f2fe"))
@@ -409,12 +565,12 @@ class MasterPagesMixin:
                 ql.addLayout(head)
 
                 ans = QLabel(f'答案: {q.get("answer", "")[:200]}')
-                ans.setStyleSheet(f"color:{Color.TEXT_SUB};font-size:19px;")
+                ans.setStyleSheet(f"color:{Color.TEXT_SUB};font-size:19px;background:transparent;")
                 ans.setWordWrap(True)
                 ql.addWidget(ans)
                 ai = QLabel(f'AI 初评: {q.get("ai_score", "-")}    '
                             f'师傅终评: {q.get("master_score") if q.get("master_score") is not None else "未评"}')
-                ai.setStyleSheet(f"color:{Color.TEXT};font-size:19px;font-weight:600;")
+                ai.setStyleSheet(f"color:{Color.TEXT};font-size:19px;font-weight:600;background:transparent;")
                 ql.addWidget(ai)
 
                 grade_row = QHBoxLayout()
@@ -557,7 +713,7 @@ def _mastery_bar(m: dict) -> QVBoxLayout:
     box = QVBoxLayout()
     box.setSpacing(3)
     lbl = QLabel(f'{m.get("dim_name", "")} — {level}')
-    lbl.setStyleSheet(f"color:{Color.TEXT};font-size:19.5px;font-weight:600;")
+    lbl.setStyleSheet(f"color:{Color.TEXT};font-size:19.5px;font-weight:600;background:transparent;")
     box.addWidget(lbl)
     bar = QProgressBar()
     bar.setMaximum(100)

@@ -27,9 +27,10 @@ if _fh is not None:
                                        datefmt="%H:%M:%S"))
     logging.getLogger().addHandler(_fh)
 
+from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel,
-    QStackedWidget, QScrollArea, QButtonGroup,
+    QStackedWidget, QScrollArea, QButtonGroup, QFrame,
 )
 
 from ui.api import ApiMixin, BASE_URL
@@ -121,6 +122,7 @@ class MainWindow(
         self.stack = QStackedWidget()
         self.stack.setObjectName("content")
         self.pages = {}
+        self._page_inners = {}
         for pid in page_ids:
             page = self._create_page(pid)
             self.pages[pid] = page
@@ -163,8 +165,33 @@ class MainWindow(
 
         role_names = {"admin": "管理员", "master": "师傅", "apprentice": "徒弟"}
         display = self.user.get("full_name") or self.user.get("username", "")
-        info = QLabel(f'👤 {display}\n{role_names.get(self.user.get("role"), self.user.get("role"))}')
+        role_text = role_names.get(self.user.get("role"), self.user.get("role") or "")
+
+        info = QWidget()
         info.setObjectName("userinfo")
+        info_lay = QHBoxLayout(info)
+        info_lay.setContentsMargins(32, 10, 32, 10)
+        info_lay.setSpacing(12)
+
+        avatar = QLabel("👤")
+        avatar.setObjectName("userAvatar")
+        avatar.setFixedWidth(34)
+        avatar.setAlignment(Qt.AlignLeft | Qt.AlignTop)
+        info_lay.addWidget(avatar, 0, Qt.AlignTop)
+
+        text_col = QVBoxLayout()
+        text_col.setContentsMargins(0, 0, 0, 0)
+        text_col.setSpacing(2)
+        name_lbl = QLabel(display)
+        name_lbl.setObjectName("userName")
+        name_lbl.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+        role_lbl = QLabel(role_text)
+        role_lbl.setObjectName("userRole")
+        role_lbl.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+        text_col.addWidget(name_lbl)
+        text_col.addWidget(role_lbl)
+        info_lay.addLayout(text_col, 1)
+
         lay.addWidget(info)
 
         logout = QPushButton("🚪  退出登录")
@@ -174,17 +201,40 @@ class MainWindow(
         return sidebar
 
     # ---------- 页面路由 ----------
-    def _create_page(self, pid) -> QScrollArea:
+    def _create_page(self, pid):
+        """构建单页：固定头部(标题+副标题) + 紧贴其下的可滚动画布(pageInner)。
+
+        副标题(15.5px/灰)常驻顶部不随滚动；QScrollArea 无边框透明、紧贴副标题下沿；
+        pageInner 内 QVBoxLayout 从上向下排布，底部 addStretch(1) 贴顶。
+        """
+        page = QWidget()
+        page.setStyleSheet(f"background: {Color.BG};")
+        v = QVBoxLayout(page)
+        v.setContentsMargins(52, 28, 52, 20)
+        v.setSpacing(8)
+
+        _, page_title, page_sub = PAGE_META[pid]
+        v.addWidget(title_label(page_title))
+        v.addWidget(subtitle_label(page_sub))
+
         scroll = QScrollArea()
+        scroll.setObjectName("pageScroll")
         scroll.setWidgetResizable(True)
-        container = QWidget()
-        container.setStyleSheet(f"background: {Color.BG};")
-        layout = QVBoxLayout(container)
-        layout.setContentsMargins(52, 36, 52, 36)
-        layout.setSpacing(20)
-        container.setProperty("pageId", pid)
-        scroll.setWidget(container)
-        return scroll
+        scroll.setFrameShape(QFrame.NoFrame)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        scroll.setStyleSheet("QScrollArea{background:transparent;}")
+
+        inner = QWidget()
+        inner.setObjectName("pageInner")
+        inner.setProperty("pageId", pid)
+        il = QVBoxLayout(inner)
+        il.setContentsMargins(0, 14, 0, 0)
+        il.setSpacing(20)
+        scroll.setWidget(inner)
+
+        v.addWidget(scroll, 1)
+        self._page_inners[pid] = inner
+        return page
 
     def _switch_page(self, pid):
         self.stack.setCurrentWidget(self.pages[pid])
@@ -193,8 +243,8 @@ class MainWindow(
         self._load_page(pid)
 
     def _load_page(self, pid):
-        container = self.pages[pid].widget()
-        layout = container.layout()
+        inner = self._page_inners[pid]
+        layout = inner.layout()
         while layout.count():
             item = layout.takeAt(0)
             w = item.widget()
@@ -202,10 +252,6 @@ class MainWindow(
                 w.deleteLater()
             elif item.layout():
                 self._clear_sub_layout(item.layout())
-
-        _, page_title, page_sub = PAGE_META[pid]
-        layout.addWidget(title_label(page_title))
-        layout.addWidget(subtitle_label(page_sub))
 
         builders = {
             "admin_overview": self._build_admin_overview,
@@ -236,7 +282,7 @@ class MainWindow(
         if pid in builders:
             logger.debug("开始构建页面 pid=%s", pid)
             try:
-                builders[pid](layout, container)
+                builders[pid](layout, inner)
                 logger.debug("页面构建完成 pid=%s", pid)
             except Exception as e:
                 logger.exception("构建页面 pid=%s 时抛出异常: %r", pid, e)
