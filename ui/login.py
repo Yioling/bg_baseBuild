@@ -107,7 +107,7 @@ class LoginDialog(QDialog):
         self.msg.setObjectName("loginMsg")
         self.msg.setAlignment(Qt.AlignCenter)
         self.msg.setWordWrap(True)
-        self.msg.setStyleSheet("color:#dc2626;")
+        self.msg.setStyleSheet("color:#dc2626;background:transparent;")
         root.addWidget(self.msg)
 
         # 提交按钮
@@ -213,7 +213,7 @@ class LoginDialog(QDialog):
 
         tip = QLabel("💡 徒弟账号由师傅在系统内创建；注册后需管理员审核通过方可登录。")
         tip.setWordWrap(True)
-        tip.setStyleSheet("color:#9c8a8a;font-size:18px;")
+        tip.setStyleSheet("color:#9c8a8a;font-size:18px;background:transparent;")
         lay.addWidget(tip)
         lay.addStretch()
         return self._wrap_scroll(w)
@@ -239,7 +239,7 @@ class LoginDialog(QDialog):
 
     def _set_msg(self, text: str, ok: bool = False, warn: bool = False):
         color = "#059669" if ok else ("#b45309" if warn else "#dc2626")
-        self.msg.setStyleSheet(f"color:{color};")
+        self.msg.setStyleSheet(f"color:{color};background:transparent;")
         self.msg.setText(text)
 
     def _load_companies(self):
