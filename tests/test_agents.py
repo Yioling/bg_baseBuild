@@ -3,7 +3,7 @@ import pytest
 from unittest.mock import patch
 
 import backend.db as dbmod
-from backend.agents.assessor import grade_quiz_answer
+from backend.agents.assessor import grade_quiz_answer, analyze_weaknesses, generate_training_recommendation
 from backend.llm import extract_json
 
 
@@ -117,12 +117,14 @@ def test_extract_json_invalid():
 # ---------- 现有 agent 签名回归测试 ----------
 
 def test_assessor_exports(conn):
-    """assessor 现有 4 个函数签名未被破坏。"""
+    """assessor 现有函数签名未被破坏（含新增的 analyze_weaknesses 和 generate_training_recommendation）。"""
     from backend.agents import assessor
     assert callable(assessor.generate_assessment)
     assert callable(assessor.grade_answer)
     assert callable(assessor.get_assessment_result)
     assert callable(assessor.get_mistakes)
+    assert callable(assessor.analyze_weaknesses)
+    assert callable(assessor.generate_training_recommendation)
 
 
 def test_assessor_generate_assessment_returns_success(conn, monkeypatch):
@@ -141,6 +143,118 @@ def test_assessor_get_mistakes_returns_structure(conn):
     assert res["success"] is True
     assert "assess_mistakes" in res
     assert "review_mistakes" in res
+
+
+# ---------- analyze_weaknesses 测试 ----------
+
+def test_analyze_weaknesses_no_assessment(conn):
+    """评估ID不存在时返回失败。"""
+    res = analyze_weaknesses(assessment_id=9999)
+    assert res["success"] is False
+    assert "message" in res
+
+
+def test_analyze_weaknesses_mock_mode(conn):
+    """演示模式下返回完整的兜底分析结构。"""
+    from unittest.mock import patch
+    with patch("backend.agents.assessor.use_mock", lambda: True):
+        # 先创建一个评估记录和题目
+        conn.execute(
+            "INSERT INTO assessments (apprentice_id, kb_id, status) VALUES (?, ?, ?)",
+            (1, 1, "in_progress")
+        )
+        ass_id = conn.lastrowid
+        conn.execute(
+            "INSERT INTO assessment_questions (assessment_id, dimension_id, question, qtype, difficulty, answer_key) VALUES (?, ?, ?, ?, ?, ?)",
+            (ass_id, 1, "测试题", "choice", "易", "A")
+        )
+        conn.commit()
+
+        res = analyze_weaknesses(assessment_id=ass_id)
+        assert res["success"] is True
+        assert "weakness_summary" in res
+        assert "weak_points" in res
+        assert isinstance(res["weak_points"], list)
+
+
+def test_analyze_weaknesses_returns_all_fields(conn):
+    """返回结构包含所有必需字段。"""
+    from unittest.mock import patch
+    with patch("backend.agents.assessor.use_mock", lambda: True):
+        conn.execute(
+            "INSERT INTO assessments (apprentice_id, kb_id, status) VALUES (?, ?, ?)",
+            (1, 1, "in_progress")
+        )
+        ass_id = conn.lastrowid
+        conn.execute(
+            "INSERT INTO assessment_questions (assessment_id, dimension_id, question, qtype, difficulty, answer_key) VALUES (?, ?, ?, ?, ?, ?)",
+            (ass_id, 1, "测试题", "short", "中", "关键点")
+        )
+        conn.commit()
+
+        res = analyze_weaknesses(assessment_id=ass_id)
+        assert "strength_points" in res
+        assert "next_study_priority" in res
+        assert "estimated_improvement" in res
+
+
+# ---------- generate_training_recommendation 测试 ----------
+
+def test_generate_training_recommendation_no_apprentice(conn):
+    """徒弟ID不存在时返回失败。"""
+    res = generate_training_recommendation(apprentice_id=9999)
+    assert res["success"] is False
+    assert "message" in res
+
+
+def test_generate_training_recommendation_mock_mode(conn):
+    """演示模式下返回完整的兜底培养建议。"""
+    from unittest.mock import patch
+    with patch("backend.agents.assessor.use_mock", lambda: True):
+        res = generate_training_recommendation(apprentice_id=1)
+        assert res["success"] is True
+        assert "training_overview" in res
+        assert "recommendations" in res
+        assert isinstance(res["recommendations"], list)
+        assert len(res["recommendations"]) > 0
+        # 验证recommendation结构完整
+        rec = res["recommendations"][0]
+        assert "priority" in rec
+        assert "dimension" in rec
+        assert "target_issue" in rec
+        assert "learning_content" in rec
+        assert "practical_tasks" in rec
+        assert "duration_estimate" in rec
+        assert "success_criteria" in rec
+
+
+def test_generate_training_recommendation_with_assessment(conn):
+    """带有assessment_id时能正常处理。"""
+    from unittest.mock import patch
+    with patch("backend.agents.assessor.use_mock", lambda: True):
+        # 创建评估
+        conn.execute(
+            "INSERT INTO assessments (apprentice_id, kb_id, status) VALUES (?, ?, ?)",
+            (1, 1, "in_progress")
+        )
+        ass_id = conn.lastrowid
+        conn.commit()
+
+        res = generate_training_recommendation(apprentice_id=1, assessment_id=ass_id)
+        assert res["success"] is True
+        assert "daily_schedule_suggestion" in res
+        assert "encouragement" in res
+
+
+def test_generate_training_recommendation_returns_non_empty(conn):
+    """培养建议各字段非空。"""
+    from unittest.mock import patch
+    with patch("backend.agents.assessor.use_mock", lambda: True):
+        res = generate_training_recommendation(apprentice_id=1)
+        assert res["success"] is True
+        assert res["training_overview"] != ""
+        assert res["daily_schedule_suggestion"] != ""
+        assert res["encouragement"] != ""
 
 
 # ---------- refiner 签名回归 ----------
