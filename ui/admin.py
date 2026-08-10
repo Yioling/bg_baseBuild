@@ -287,12 +287,16 @@ class AdminPagesMixin:
                 act = QLabel(f'[{lg.get("action", "")}]')
                 act.setStyleSheet(f"color:{Color.PRIMARY};font-size:19px;font-weight:700;min-width:110px;background:transparent;")
                 ll.addWidget(act)
+                # 目标 + 详情，各段空格间隔；超长 detail 截断（系统 JSON 数百字）防重叠
+                detail_raw = str(lg.get("detail", "") or "")
+                if len(detail_raw) > 60:
+                    detail_raw = detail_raw[:60] + "…"
                 detail = QLabel(
-                    f'{lg.get("target_type", "")} #{lg.get("target_id", "")}  {lg.get("detail", "")}')
+                    f'  {lg.get("target_type", "")} #{lg.get("target_id", "")}  {detail_raw}')
                 detail.setStyleSheet(f"color:{Color.TEXT};font-size:19px;background:transparent;")
                 ll.addWidget(detail)
                 ll.addStretch()
-                t = QLabel(str(lg.get("created_at", ""))[:19])
+                t = QLabel(f"  {str(lg.get('created_at', ''))[:19]}")
                 t.setStyleSheet(f"color:{Color.TEXT_MUTED};font-size:18px;background:transparent;")
                 ll.addWidget(t)
                 layout.addWidget(lf)

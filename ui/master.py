@@ -27,7 +27,7 @@ from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QGridLayout, QLabel, QLineEdit, QTextEdit,
     QPushButton, QGroupBox, QComboBox, QCheckBox, QProgressBar, QFrame,
     QTableWidget, QTableWidgetItem, QHeaderView, QMessageBox, QDoubleSpinBox,
-    QFileDialog, QAbstractItemView, QScrollArea, QApplication,
+    QFileDialog, QAbstractItemView, QScrollArea, QApplication, QDialog,
 )
 from PyQt5.QtCore import Qt, QMimeData, QUrl
 
@@ -434,6 +434,121 @@ class MasterPagesMixin:
         self._api_call("POST", f"{BASE_URL}/api/master/plan/generate",
                        {"apprentice_id": appr_id},
                        callback=lambda r: QMessageBox.information(self, "结果", r.get("message", "")))
+
+    # ==================== 公司公共资料库 ====================
+    # 管理员在「课程库」维护的公司预置课程，是给师傅的默认预置知识库。
+    # 本页专注查看/浏览预置资源，复用 GET /api/master/courses（与定制计划选课同源）。
+    _COURSE_TYPE_NAMES = {
+        "document": "📄 文档", "video": "🎬 视频", "link": "🔗 链接",
+        "quiz_bank": "📝 题库",
+    }
+
+    def _build_master_library(self, layout, container):
+        g = QGroupBox("📖 公共资料库")
+        gl = QVBoxLayout(g)
+        gl.setSpacing(12)
+
+        top = QHBoxLayout()
+        top.addWidget(QLabel("类型筛选:"))
+        type_filter = QComboBox()
+        type_filter.addItem("全部", "all")
+        for k, v in self._COURSE_TYPE_NAMES.items():
+            type_filter.addItem(v, k)
+        top.addWidget(type_filter, 1)
+        count_lbl = QLabel("")
+        count_lbl.setStyleSheet(f"color:{Color.TEXT_SUB};font-size:19px;background:transparent;")
+        top.addWidget(count_lbl)
+        gl.addLayout(top)
+
+        area_wrap = QWidget()
+        area_wrap.setStyleSheet(f"background:{Color.SURFACE};border-radius:{12}px;")
+        area = QVBoxLayout(area_wrap)
+        area.setContentsMargins(16, 16, 16, 16)
+        area.setSpacing(10)
+        gl.addWidget(area_wrap)
+
+        self._lib_all_courses = []
+        loading = loading_label()
+        area.addWidget(loading)
+
+        def render(filter_key):
+            while area.count():
+                it = area.takeAt(0)
+                if it.widget():
+                    it.widget().deleteLater()
+            courses = [c for c in self._lib_all_courses
+                       if filter_key == "all" or c.get("type") == filter_key]
+            count_lbl.setText(f"共 {len(courses)} 门课程")
+            if not courses:
+                area.addWidget(empty_label("暂无公共资料，请联系管理员在课程库添加"))
+                return
+            for c in courses:
+                cf = card(padding=20)
+                cl = QVBoxLayout(cf)
+                cl.setSpacing(8)
+                head = QHBoxLayout()
+                title = QLabel(f'📚 {c.get("title", "未命名课程")}')
+                title.setStyleSheet(f"font-weight:700;font-size:24px;color:{Color.TEXT};background:transparent;")
+                title.setWordWrap(True)
+                head.addWidget(title, 1)
+                head.addWidget(badge(self._COURSE_TYPE_NAMES.get(c.get("type", ""), c.get("type", "")),
+                                     Color.PRIMARY, Color.PRIMARY_SOFT))
+                cl.addLayout(head)
+                summary = QLabel((c.get("content") or "").strip()[:60] or "（无内容摘要）")
+                summary.setStyleSheet(f"color:{Color.TEXT_SUB};font-size:19px;background:transparent;")
+                summary.setWordWrap(True)
+                cl.addWidget(summary)
+                detail_btn = secondary_button("📖 查看详情")
+                detail_btn.clicked.connect(lambda checked, cc=c: self._view_library_course(cc))
+                cl.addWidget(detail_btn, alignment=Qt.AlignLeft)
+                area.addWidget(cf)
+
+        def on_load(res):
+            loading.deleteLater()
+            if not res.get("success"):
+                area.addWidget(empty_label(res.get("message", "加载失败")))
+                return
+            self._lib_all_courses = res.get("courses", [])
+            render(type_filter.currentData())
+
+        type_filter.currentIndexChanged.connect(lambda _i: render(type_filter.currentData()))
+        layout.addWidget(g)
+
+        self._api_call("GET", f"{BASE_URL}/api/master/courses", callback=on_load)
+
+    def _view_library_course(self, course):
+        """弹窗查看课程完整内容（只读）。"""
+        dlg = QDialog(self)
+        dlg.setWindowTitle(course.get("title", "课程详情"))
+        dlg.resize(560, 600)
+        lay = QVBoxLayout(dlg)
+        lay.setSpacing(12)
+        head = QHBoxLayout()
+        title = QLabel(f'📚 {course.get("title", "")}')
+        title.setStyleSheet(f"font-weight:700;font-size:24px;color:{Color.TEXT};background:transparent;")
+        title.setWordWrap(True)
+        head.addWidget(title, 1)
+        head.addWidget(badge(self._COURSE_TYPE_NAMES.get(course.get("type", ""), course.get("type", "")),
+                             Color.PRIMARY, Color.PRIMARY_SOFT))
+        lay.addLayout(head)
+        body = QLabel(course.get("content") or "（暂无内容）")
+        body.setStyleSheet(f"color:{Color.TEXT};font-size:20px;background:transparent;")
+        body.setWordWrap(True)
+        body.setAlignment(Qt.AlignTop | Qt.AlignLeft)
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.NoFrame)
+        scroll.setStyleSheet("QScrollArea{background:transparent;}")
+        inner = QWidget()
+        il = QVBoxLayout(inner)
+        il.setContentsMargins(0, 0, 0, 0)
+        il.addWidget(body)
+        scroll.setWidget(inner)
+        lay.addWidget(scroll, 1)
+        close_btn = primary_button("关闭")
+        close_btn.clicked.connect(dlg.accept)
+        lay.addWidget(close_btn, alignment=Qt.AlignRight)
+        dlg.exec_()
 
     # ==================== 定制培养计划 ====================
     def _build_master_plans(self, layout, container):

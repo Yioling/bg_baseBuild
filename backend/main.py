@@ -1,7 +1,7 @@
 """FastAPI 主应用：路由 + 前端托管。"""
 import json
 from pathlib import Path
-from fastapi import FastAPI, Request, HTTPException, Depends
+from fastapi import FastAPI, Request, HTTPException, Depends, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
@@ -20,7 +20,10 @@ from backend.schemas import (LoginReq, RegisterReq, CreateApprenticeReq, IngestP
                              PasswordResetRequestReq, PasswordResetReq)
 
 from backend.vectorstore import VectorStore
-from backend.ingest import ingest_local_path, ingest_urls, get_or_create_kb
+from backend.ingest import (
+    ingest_local_path, ingest_urls, get_or_create_kb,
+    ingest_course_to_kb, imported_course_ids,
+)
 from backend.agents.refiner import refine
 from backend.agents.assessor import generate_assessment, grade_answer, get_assessment_result, get_mistakes
 from backend.agents.planner import generate_plan, get_plan, update_plan_day, update_plan_task
@@ -31,6 +34,10 @@ from backend.courses import (
     list_courses as courses_list_courses,
     create_course, update_course, delete_course,
     add_course_question, list_course_questions,
+)
+from backend.social import (
+    upload_attachment_binary, get_attachment_content, bind_attachments_to_post,
+    get_post_attachments,
 )
 # P6 已提供 list_courses(company_id)。管理员路线已接（/api/admin/courses）；
 # 以下新增 /api/master/courses 给师傅使用（同一函数，不需 admin 守卫，仅同公司隔离）。
@@ -721,6 +728,29 @@ def api_master_courses(user: dict = Depends(auth_user)):
     return courses_list_courses(user["company_id"])
 
 
+@app.get("/api/master/library/imported")
+def api_master_library_imported(user: dict = Depends(auth_user)):
+    """返回已纳入本师傅知识库的公共课程 id 集合（用于前端“已加入”态）。"""
+    if not require_master(user):
+        raise HTTPException(status_code=403, detail="仅师傅可操作")
+    return {"success": True, "imported": imported_course_ids(user["user_id"])}
+
+
+@app.post("/api/master/library/import/{course_id}")
+def api_master_library_import(course_id: int, user: dict = Depends(auth_user)):
+    """把公共课程纳入当前师傅知识库（幂等）。"""
+    if not require_master(user):
+        raise HTTPException(status_code=403, detail="仅师傅可操作")
+    conn = get_conn()
+    row = conn.execute(
+        "SELECT * FROM courses WHERE id=? AND company_id=?",
+        (course_id, user["company_id"]),
+    ).fetchone()
+    if not row:
+        raise HTTPException(status_code=404, detail="课程不存在")
+    return ingest_course_to_kb(user["user_id"], dict(row), get_store())
+
+
 @app.post("/api/master/quizzes/{quiz_id}/score")
 def api_master_score_quiz(quiz_id: int, data: dict, user: dict = Depends(auth_user)):
     """师傅修改检测评分（终评）"""
@@ -859,6 +889,32 @@ def api_progress_same_master(user: dict = Depends(auth_user)):
 
 
 # ==================== V2：交流圈 ====================
+@app.post("/api/attachments")
+async def api_upload_attachment(file: UploadFile = File(...), user: dict = Depends(auth_user)):
+    """上传交流圈附件（图片/文件）。落盘 + 写 post_attachments 表，返回元数据。"""
+    data = await file.read()
+    return upload_attachment_binary(user, file.filename or "unnamed", data)
+
+
+@app.get("/api/attachments/{attachment_id}/content")
+def api_attachment_content(attachment_id: int, user: dict = Depends(auth_user)):
+    """按 id 返回附件文件字节流（图片可直接展示，其余可下载）。"""
+    att = get_attachment_content(attachment_id)
+    if not att:
+        raise HTTPException(status_code=404, detail="附件不存在")
+    media = att["mime"] if att["mime"].startswith("image/") else "application/octet-stream"
+    # 文件名含中文时需 URL 编码（RFC 5987 filename*），否则 latin-1 头编码报错
+    from urllib.parse import quote
+    fname = att["file_name"] or "attachment"
+    try:
+        fname.encode("latin-1")
+        cd = f'attachment; filename="{fname}"'
+    except UnicodeEncodeError:
+        cd = f"attachment; filename*=UTF-8''{quote(fname)}"
+    return StreamingResponse(io.BytesIO(att["data"]), media_type=media,
+                             headers={"Content-Disposition": cd})
+
+
 @app.post("/api/posts")
 def api_create_post(data: dict, user: dict = Depends(auth_user)):
     conn = get_conn()
@@ -866,8 +922,11 @@ def api_create_post(data: dict, user: dict = Depends(auth_user)):
         "INSERT INTO company_posts (company_id, author_id, author_name, author_role, content) VALUES (?, ?, ?, ?, ?)",
         (user["company_id"], user["user_id"], data.get("author_name", user.get("full_name", user["username"])),
          user["role"], data["content"]))
+    post_id = cur.lastrowid
+    # 绑定附件（先上传后发帖，attachment_ids 可选）
+    bind_attachments_to_post(post_id, data.get("attachment_ids") or [], conn=conn)
     conn.commit()
-    return {"success": True, "post_id": cur.lastrowid}
+    return {"success": True, "post_id": post_id}
 
 
 @app.get("/api/posts")
@@ -882,6 +941,19 @@ def api_get_posts(user: dict = Depends(auth_user)):
         d["likes_count"] = conn.execute("SELECT COUNT(*) FROM post_likes WHERE post_id=?", (r["id"],)).fetchone()[0]
         d["liked_by_me"] = bool(conn.execute("SELECT id FROM post_likes WHERE post_id=? AND user_id=?",
                                              (r["id"], user["user_id"])).fetchone())
+        d["attachments"] = get_post_attachments(
+            r["id"], conn=conn, company_id=user["company_id"]).get("attachments", [])
+        # 本地二进制附件：url 为磁盘相对路径（post_files/...），规范为可访问的 API 路径，
+        # 并按文件名推断 mime（表无 mime 列），供前端区分图片/文件、下载补全扩展名。
+        for a in d["attachments"]:
+            a["url"] = f"/api/attachments/{a['id']}/content"
+            fn = a.get("file_name") or ""
+            ext = fn.rsplit(".", 1)[-1].lower() if "." in fn else ""
+            a["mime"] = {
+                "png": "image/png", "jpg": "image/jpeg", "jpeg": "image/jpeg",
+                "gif": "image/gif", "webp": "image/webp", "bmp": "image/bmp",
+                "pdf": "application/pdf",
+            }.get(ext, "application/octet-stream")
         posts.append(d)
     return {"success": True, "posts": posts}
 
@@ -963,6 +1035,11 @@ def api_admin_approve(data: dict, user: dict = Depends(auth_user)):
     conn = get_conn()
     conn.execute("UPDATE users SET status='approved', approved_by=?, approved_at=datetime('now') WHERE id=?",
                  (user["user_id"], data["user_id"]))
+    # 写入操作日志（审核通过）
+    conn.execute(
+        "INSERT INTO admin_logs (admin_id, action, target_type, target_id, detail) "
+        "VALUES (?, 'approve', 'user', ?, '审核通过')",
+        (user["user_id"], data["user_id"]))
     conn.commit()
     return {"success": True, "message": "已通过审核"}
 
@@ -973,6 +1050,11 @@ def api_admin_reject(data: dict, user: dict = Depends(auth_user)):
         raise HTTPException(status_code=403, detail="仅管理员可操作")
     conn = get_conn()
     conn.execute("UPDATE users SET status='rejected' WHERE id=?", (data["user_id"],))
+    # 写入操作日志（驳回）
+    conn.execute(
+        "INSERT INTO admin_logs (admin_id, action, target_type, target_id, detail) "
+        "VALUES (?, 'reject', 'user', ?, '驳回')",
+        (user["user_id"], data["user_id"]))
     conn.commit()
     return {"success": True, "message": "已驳回"}
 
@@ -1025,7 +1107,11 @@ def api_admin_logs(user: dict = Depends(auth_user)):
     if not require_admin(user):
         raise HTTPException(status_code=403, detail="仅管理员可操作")
     conn = get_conn()
-    rows = conn.execute("SELECT * FROM admin_logs ORDER BY id DESC LIMIT 200").fetchall()
+    # 仅返回用户操作日志：排除系统自动任务日志（admin_id=0 或 NULL，如 self_purify）
+    rows = conn.execute(
+        "SELECT * FROM admin_logs WHERE admin_id IS NOT NULL AND admin_id > 0 "
+        "ORDER BY id DESC LIMIT 200"
+    ).fetchall()
     return {"success": True, "logs": [dict(r) for r in rows]}
 
 

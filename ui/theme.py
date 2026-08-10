@@ -553,3 +553,17 @@ def divider() -> QFrame:
     line.setFrameShape(QFrame.HLine)
     line.setStyleSheet(f"color:{Color.BORDER};background:{Color.BORDER};max-height:1px;")
     return line
+
+
+def chip(text: str, color: str = Color.PRIMARY, bg: str = Color.PRIMARY_SOFT) -> QLabel:
+    """附件/标签小圆片：圆角柔和底 + 主色文字，靠 background 着色。
+
+    返回 QLabel（QWidget 子类），样式仅作用于自身，遵守铁律。
+    """
+    l = QLabel(text)
+    l.setStyleSheet(
+        f"background:{bg};color:{color};border-radius:{Radius.PILL}px;"
+        f"padding:6px 14px;font-size:18px;font-weight:500;"
+    )
+    l.setAlignment(Qt.AlignCenter)
+    return l

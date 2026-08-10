@@ -366,3 +366,98 @@ def get_or_create_kb(master_id: int) -> dict:
     finally:
         # 不 close 连接（线程本地缓存复用），避免破坏缓存的连接导致 WAL 锁
         pass
+
+
+# ---- 公共资料库课程 -> 师傅知识库 ----
+# location 用 "course:{course_id}" 作为幂等键，与文件路径/URL 互不冲突。
+
+
+def imported_course_ids(master_id: int) -> list[int]:
+    """返回该师傅知识库已纳入（投喂过）的公共课程 id 集合（幂等查询）。
+
+    按 location 前缀 course: 过滤（kb_sources.source_type 有 CHECK 约束只允许 file/url，
+    故用 location 标记课程来源，source_type 复用 'url'）。
+    """
+    conn = get_conn()
+    try:
+        kb = conn.execute(
+            "SELECT id FROM knowledge_bases WHERE master_id=? LIMIT 1", (master_id,)
+        ).fetchone()
+        if not kb:
+            return []
+        rows = conn.execute(
+            "SELECT location FROM kb_sources WHERE kb_id=?", (kb["id"],),
+        ).fetchall()
+        ids = []
+        for r in rows:
+            loc = r["location"] or ""
+            if loc.startswith("course:"):
+                try:
+                    ids.append(int(loc.split(":", 1)[1]))
+                except ValueError:
+                    continue
+        return ids
+    finally:
+        pass
+
+
+def ingest_course_to_kb(master_id: int, course: dict, store: VectorStore) -> dict:
+    """把一门公共课程纳入师傅知识库（幂等）。
+
+    course: {id, title, type, content, ...}（来自 courses 表）。
+    复用分块/嵌入/入库链路；已纳入则返回 success + already=True，不重复入库。
+    """
+    course_id = int(course["id"])
+    text = (course.get("content") or "").strip()
+    if not text:
+        return {"success": False, "message": "课程内容为空，无法纳入知识库"}
+
+    kb = get_or_create_kb(master_id)
+    kb_id = kb["id"]
+    location = f"course:{course_id}"
+
+    conn = get_conn()
+    try:
+        existing = _existing_sources(conn, kb_id)
+        if location in existing:
+            return {"success": True, "already": True,
+                    "message": "该课程已加入你的知识库", "course_id": course_id}
+
+        title = course.get("title") or f"课程{course_id}"
+        # 存入 kb_documents（raw_text 供 Refiner 精炼）
+        conn.execute(
+            "INSERT INTO kb_documents (kb_id, filename, raw_text) VALUES (?, ?, ?)",
+            (kb_id, f"[课程] {title}", text),
+        )
+        # 存入 kb_sources（location 幂等键）
+        conn.execute(
+            "INSERT INTO kb_sources (kb_id, source_type, location, title) VALUES (?, 'course', ?, ?)",
+            (kb_id, location, title),
+        )
+        # 分块
+        all_chunks = []
+        for chunk in _chunk_text(text):
+            all_chunks.append({
+                "text": chunk,
+                "source": location,
+                "meta": json.dumps({"course_id": course_id, "title": title},
+                                   ensure_ascii=False),
+            })
+        conn.commit()
+
+        embedded, err = _ingest_chunks(conn, kb_id, all_chunks, store)
+        msg = f"已加入课程「{title}」，共 {len(all_chunks)} 个文本块"
+        if not embedded:
+            msg += "（注意：向量化失败，元数据已存但暂不可检索）"
+            if err:
+                msg += f"——{err}"
+        return {
+            "success": True,
+            "already": False,
+            "message": msg,
+            "course_id": course_id,
+            "chunk_count": len(all_chunks),
+        }
+    finally:
+        # 不 close 连接（线程本地缓存复用）
+        pass

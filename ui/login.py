@@ -117,14 +117,30 @@ class LoginDialog(QDialog):
         self.btn.clicked.connect(self._do_auth)
         root.addWidget(self.btn)
 
+    # 三种登录身份对应的 placeholder / 提示文案
+    _ROLE_META = {
+        "apprentice": ("👤 徒弟", "输入学徒账号", "💡 登录后进入学习计划与复习"),
+        "master": ("👤 师傅", "输入工号或用户名", "💡 登录后管理徒弟与知识库"),
+        "admin": ("👤 管理员", "输入管理员账号", "💡 登录后管理审核与系统"),
+    }
+
     def _build_login_form(self) -> QWidget:
         w = QWidget()
         lay = QVBoxLayout(w)
         lay.setContentsMargins(0, 10, 0, 0)
         lay.setSpacing(16)
+
+        lay.addWidget(QLabel("登录身份"))
+        self.l_role = QComboBox()
+        self.l_role.addItem(self._ROLE_META["apprentice"][0], "apprentice")
+        self.l_role.addItem(self._ROLE_META["master"][0], "master")
+        self.l_role.addItem(self._ROLE_META["admin"][0], "admin")
+        self.l_role.currentIndexChanged.connect(self._on_role_changed)
+        lay.addWidget(self.l_role)
+
         lay.addWidget(QLabel("用户名"))
         self.l_uname = QLineEdit()
-        self.l_uname.setPlaceholderText("输入用户名")
+        self.l_uname.setPlaceholderText(self._ROLE_META["apprentice"][1])
         lay.addWidget(self.l_uname)
         lay.addWidget(QLabel("密码"))
         self.l_pwd = QLineEdit()
@@ -132,8 +148,21 @@ class LoginDialog(QDialog):
         self.l_pwd.setPlaceholderText("输入密码")
         self.l_pwd.returnPressed.connect(self._do_auth)
         lay.addWidget(self.l_pwd)
+
+        self.l_role_tip = QLabel(self._ROLE_META["apprentice"][2])
+        self.l_role_tip.setWordWrap(True)
+        self.l_role_tip.setStyleSheet("color:#9c8a8a;font-size:18px;background:transparent;")
+        lay.addWidget(self.l_role_tip)
+
         lay.addStretch()
         return w
+
+    def _on_role_changed(self):
+        """切换登录身份：更新输入框 placeholder 与模式提示文案。"""
+        key = self.l_role.currentData() or "apprentice"
+        meta = self._ROLE_META.get(key, self._ROLE_META["apprentice"])
+        self.l_uname.setPlaceholderText(meta[1])
+        self.l_role_tip.setText(meta[2])
 
     def _build_register_form(self) -> QWidget:
         w = QWidget()
@@ -294,8 +323,18 @@ class LoginDialog(QDialog):
     def _on_login(self, res):
         self._lock(False, "登 录")
         if res.get("success"):
+            user = res.get("user") or {}
+            # 登录身份一致性校验（纯前端本地判断）：所选身份须与实际角色一致
+            chosen = self.l_role.currentData()
+            actual = user.get("role")
+            if chosen and actual and chosen != actual:
+                role_names = {"apprentice": "徒弟", "master": "师傅", "admin": "管理员"}
+                self._set_msg(
+                    f"该账号为{role_names.get(actual, actual)}，请切换对应身份登录",
+                    warn=True)
+                return
             self.token = res["token"]
-            self.user = res["user"]
+            self.user = user
             self.accept()
             return
         message = res.get("message", "登录失败")

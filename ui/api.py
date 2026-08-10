@@ -20,16 +20,18 @@ BASE_URL = os.getenv("API_BASE", f"http://127.0.0.1:{SERVER_PORT}")
 class ApiThread(QThread):
     finished = pyqtSignal(dict)
 
-    def __init__(self, method, url, body=None, token=None):
+    def __init__(self, method, url, body=None, token=None, files=None, raw=False):
         super().__init__()
         self.method = method.upper()
         self.url = url
         self.body = body
         self.token = token
+        self.files = files  # multipart 文件字段: {field: (filename, bytes, mime)} 或文件对象列表
+        self.raw = raw      # True 时返回原始字节（图片预览/文件下载）
 
     def run(self):
         try:
-            headers = {"Content-Type": "application/json"}
+            headers = {}
             if self.token:
                 headers["Authorization"] = f"Bearer {self.token}"
             r = None
@@ -38,8 +40,15 @@ class ApiThread(QThread):
                     if self.method == "GET":
                         r = requests.get(self.url, headers=headers, timeout=30)
                     elif self.method == "POST":
-                        r = requests.post(self.url, json=self.body, headers=headers, timeout=30)
+                        if self.files:
+                            # multipart 上传：不设 Content-Type（requests 自动带 boundary）
+                            r = requests.post(self.url, files=self.files,
+                                              headers=headers, timeout=60)
+                        else:
+                            headers["Content-Type"] = "application/json"
+                            r = requests.post(self.url, json=self.body, headers=headers, timeout=30)
                     elif self.method == "PUT":
+                        headers["Content-Type"] = "application/json"
                         r = requests.put(self.url, json=self.body, headers=headers, timeout=30)
                     elif self.method == "DELETE":
                         r = requests.delete(self.url, headers=headers, timeout=30)
@@ -57,7 +66,15 @@ class ApiThread(QThread):
                 self.finished.emit({"success": False, "message": "无法连接到服务器，请稍后重试"})
                 return
             ct = r.headers.get("content-type", "")
-            if "application/json" in ct:
+            if self.raw:
+                # 原始字节流：图片预览 / 文件下载
+                self.finished.emit({
+                    "success": True,
+                    "data": r.content,
+                    "mime": ct,
+                    "file_name": self._filename_from(r) or "attachment",
+                })
+            elif "application/json" in ct:
                 self.finished.emit(r.json())
             elif "application/pdf" in ct:
                 desktop = Path.home() / "Desktop"
@@ -74,16 +91,26 @@ class ApiThread(QThread):
         except Exception as e:
             self.finished.emit({"success": False, "message": str(e)})
 
+    def _filename_from(self, r) -> str:
+        """从 Content-Disposition 头解析文件名，兜底返回空串。"""
+        try:
+            cd = r.headers.get("content-disposition", "")
+            if "filename=" in cd:
+                return cd.split("filename=")[1].strip('"').strip("'")
+        except Exception:
+            pass
+        return ""
+
 
 class ApiMixin:
     """给窗口类提供 `_api_call`，持有线程引用防止提前回收。"""
 
     token = None
 
-    def _api_call(self, method, url, body=None, callback=None):
+    def _api_call(self, method, url, body=None, callback=None, files=None, raw=False):
         if not hasattr(self, "_api_threads"):
             self._api_threads = []
-        thread = ApiThread(method, url, body, self.token)
+        thread = ApiThread(method, url, body, self.token, files=files, raw=raw)
         if callback:
             thread.finished.connect(callback)
         thread.finished.connect(lambda _res, t=thread: self._reap_thread(t))
