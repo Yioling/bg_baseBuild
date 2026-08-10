@@ -27,7 +27,7 @@ from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QGridLayout, QLabel, QLineEdit, QTextEdit,
     QPushButton, QGroupBox, QComboBox, QCheckBox, QProgressBar, QFrame,
     QTableWidget, QTableWidgetItem, QHeaderView, QMessageBox, QDoubleSpinBox,
-    QFileDialog, QAbstractItemView, QScrollArea, QApplication,
+    QFileDialog, QAbstractItemView, QScrollArea, QApplication, QDialog,
 )
 from PyQt5.QtCore import Qt, QMimeData, QUrl
 
@@ -36,6 +36,7 @@ from ui.theme import (
     Color, card, stat_card, section_label, hint_label, loading_label,
     empty_label, primary_button, success_button, secondary_button, badge, refine_button,
     apply_shadow, ingest_button, guide_item, GUIDE_BOX_TITLE_QSS,
+    screen_metrics, _scaled, progress_bar,
 )
 
 
@@ -67,8 +68,8 @@ class MasterPagesMixin:
             detail_scroll.setWidgetResizable(True)
             detail_scroll.setFrameShape(QFrame.NoFrame)
             detail_scroll.setWidget(detail)
-            avail = QApplication.desktop().availableGeometry().height()
-            detail_scroll.setFixedHeight(max(300, min(460, int(avail * 0.34))))
+            avail = screen_metrics()["height"]
+            detail_scroll.setFixedHeight(max(_scaled(300), min(_scaled(460), int(avail * 0.34))))
 
             self._ov_cards = {}
 
@@ -88,7 +89,7 @@ class MasterPagesMixin:
                 builder(detail_lay)
 
             grid = QGridLayout()
-            grid.setSpacing(14)
+            grid.setSpacing(_scaled(16))
             cards = [
                 (dim_count, "知识维度", Color.PRIMARY, "dims"),
                 (pt_count, "知识点", Color.SUCCESS, "points"),
@@ -145,21 +146,18 @@ class MasterPagesMixin:
             rl.setSpacing(12)
             name = QLabel(d.get("name", "未命名"))
             name.setStyleSheet(
-                f"font-size:19px;color:{Color.TEXT};background:transparent;")
-            name.setFixedWidth(220)
+                f"font-size:{_scaled(19)}px;color:{Color.TEXT};background:transparent;")
+            name.setFixedWidth(_scaled(220))
             name.setWordWrap(True)
             rl.addWidget(name)
-            bar = QProgressBar()
-            bar.setMaximum(max_pt)
-            bar.setValue(n)
-            bar.setTextVisible(False)
-            bar.setFixedHeight(20)
+            bar = progress_bar(value=n, maximum=max_pt, color=Color.PRIMARY, height=20)
+            bar.setFixedHeight(_scaled(20))
             rl.addWidget(bar, 1)
             cnt = QLabel(str(n))
             cnt.setStyleSheet(
-                f"font-size:19px;font-weight:700;color:{Color.PRIMARY};"
+                f"font-size:{_scaled(19)}px;font-weight:700;color:{Color.PRIMARY};"
                 "background:transparent;")
-            cnt.setFixedWidth(48)
+            cnt.setFixedWidth(_scaled(48))
             cnt.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
             rl.addWidget(cnt)
             lay.addWidget(row)
@@ -192,7 +190,7 @@ class MasterPagesMixin:
             for p in pts:
                 if shown >= 60:
                     break
-                pname = p.get("name", str(p)) if isinstance(p, dict) else str(p)
+                pname = _point_title(p)
                 wl.addWidget(badge(pname, Color.SUCCESS, Color.SUCCESS_SOFT), row_i, col)
                 shown += 1
                 col += 1
@@ -349,16 +347,17 @@ class MasterPagesMixin:
                 dl = QVBoxLayout(df)
                 dl.setSpacing(6)
                 name = QLabel(d.get("name", ""))
-                name.setStyleSheet(f"font-weight:700;font-size:21px;color:{Color.TEXT};background:transparent;")
+                name.setStyleSheet(f"font-weight:700;font-size:{_scaled(21)}px;color:{Color.TEXT};background:transparent;")
                 dl.addWidget(name)
                 if d.get("description"):
                     desc = QLabel(d["description"])
-                    desc.setStyleSheet(f"color:{Color.TEXT_SUB};font-size:19px;background:transparent;")
+                    desc.setStyleSheet(f"color:{Color.TEXT_SUB};font-size:{_scaled(19)}px;background:transparent;")
                     desc.setWordWrap(True)
                     dl.addWidget(desc)
                 for p in d.get("points", []):
-                    row = QLabel(f'· {p.get("title", "")}  [{p.get("level", "")}]')
-                    row.setStyleSheet(f"color:{Color.TEXT};font-size:19.5px;padding-left:6px;background:transparent;")
+                    lvl = p.get("level", "") if isinstance(p, dict) else ""
+                    row = QLabel(f'· {_point_title(p)}  [{lvl}]')
+                    row.setStyleSheet(f"color:{Color.TEXT};font-size:{_scaled(19)}px;padding-left:{_scaled(6)}px;background:transparent;")
                     dl.addWidget(row)
                 result_area.addWidget(df)
 
@@ -434,6 +433,123 @@ class MasterPagesMixin:
         self._api_call("POST", f"{BASE_URL}/api/master/plan/generate",
                        {"apprentice_id": appr_id},
                        callback=lambda r: QMessageBox.information(self, "结果", r.get("message", "")))
+
+    # ==================== 公司公共资料库 ====================
+    # 管理员在「课程库」维护的公司预置课程，是给师傅的默认预置知识库。
+    # 本页专注查看/浏览预置资源，复用 GET /api/master/courses（与定制计划选课同源）。
+    _COURSE_TYPE_NAMES = {
+        "document": "📄 文档", "video": "🎬 视频", "link": "🔗 链接",
+        "quiz_bank": "📝 题库",
+    }
+
+    def _build_master_library(self, layout, container):
+        g = QGroupBox("📖 公共资料库")
+        gl = QVBoxLayout(g)
+        gl.setSpacing(12)
+
+        top = QHBoxLayout()
+        top.addWidget(QLabel("类型筛选:"))
+        type_filter = QComboBox()
+        type_filter.addItem("全部", "all")
+        for k, v in self._COURSE_TYPE_NAMES.items():
+            type_filter.addItem(v, k)
+        top.addWidget(type_filter, 1)
+        count_lbl = QLabel("")
+        count_lbl.setStyleSheet(f"color:{Color.TEXT_SUB};font-size:19px;background:transparent;")
+        top.addWidget(count_lbl)
+        gl.addLayout(top)
+
+        area_wrap = QWidget()
+        area_wrap.setStyleSheet(f"background:{Color.SURFACE};border-radius:{12}px;")
+        area = QVBoxLayout(area_wrap)
+        area.setContentsMargins(16, 16, 16, 16)
+        area.setSpacing(10)
+        gl.addWidget(area_wrap)
+
+        self._lib_all_courses = []
+        loading = loading_label()
+        area.addWidget(loading)
+
+        def render(filter_key):
+            while area.count():
+                it = area.takeAt(0)
+                if it.widget():
+                    it.widget().deleteLater()
+            courses = [c for c in self._lib_all_courses
+                       if filter_key == "all" or c.get("type") == filter_key]
+            count_lbl.setText(f"共 {len(courses)} 门课程")
+            if not courses:
+                area.addWidget(empty_label("暂无公共资料，请联系管理员在课程库添加"))
+                return
+            for c in courses:
+                cf = card(padding=20)
+                cl = QVBoxLayout(cf)
+                cl.setSpacing(8)
+                head = QHBoxLayout()
+                title = QLabel(f'📚 {c.get("title", "未命名课程")}')
+                title.setStyleSheet(f"font-weight:700;font-size:24px;color:{Color.TEXT};background:transparent;")
+                title.setWordWrap(True)
+                head.addWidget(title, 1)
+                head.addWidget(badge(self._COURSE_TYPE_NAMES.get(c.get("type", ""), c.get("type", "")),
+                                     Color.PRIMARY, Color.PRIMARY_SOFT))
+                cl.addLayout(head)
+                summary = QLabel((c.get("content") or "").strip()[:60] or "（无内容摘要）")
+                summary.setStyleSheet(f"color:{Color.TEXT_SUB};font-size:19px;background:transparent;")
+                summary.setWordWrap(True)
+                cl.addWidget(summary)
+                detail_btn = secondary_button("📖 查看详情")
+                detail_btn.clicked.connect(lambda checked, cc=c: self._view_library_course(cc))
+                cl.addWidget(detail_btn, alignment=Qt.AlignLeft)
+                area.addWidget(cf)
+
+        def on_load(res):
+            loading.deleteLater()
+            if not res.get("success"):
+                area.addWidget(empty_label(res.get("message", "加载失败")))
+                return
+            self._lib_all_courses = res.get("courses", [])
+            render(type_filter.currentData())
+
+        type_filter.currentIndexChanged.connect(lambda _i: render(type_filter.currentData()))
+        layout.addWidget(g)
+
+        self._api_call("GET", f"{BASE_URL}/api/master/courses", callback=on_load)
+
+    def _view_library_course(self, course):
+        """弹窗查看课程完整内容（只读）。"""
+        dlg = QDialog(self)
+        dlg.setWindowTitle(course.get("title", "课程详情"))
+        dlg.resize(_scaled(560), _scaled(600))
+        dlg.setStyleSheet(f"QDialog{{background:{Color.BG};}}")
+        lay = QVBoxLayout(dlg)
+        lay.setContentsMargins(_scaled(20), _scaled(16), _scaled(20), _scaled(16))
+        lay.setSpacing(12)
+        head = QHBoxLayout()
+        title = QLabel(f'📚 {course.get("title", "")}')
+        title.setStyleSheet(f"font-weight:700;font-size:24px;color:{Color.TEXT};background:transparent;")
+        title.setWordWrap(True)
+        head.addWidget(title, 1)
+        head.addWidget(badge(self._COURSE_TYPE_NAMES.get(course.get("type", ""), course.get("type", "")),
+                             Color.PRIMARY, Color.PRIMARY_SOFT))
+        lay.addLayout(head)
+        body = QLabel(course.get("content") or "（暂无内容）")
+        body.setStyleSheet(f"color:{Color.TEXT};font-size:20px;background:transparent;")
+        body.setWordWrap(True)
+        body.setAlignment(Qt.AlignTop | Qt.AlignLeft)
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.NoFrame)
+        scroll.setStyleSheet("QScrollArea{background:transparent;}")
+        inner = QWidget()
+        il = QVBoxLayout(inner)
+        il.setContentsMargins(0, 0, 0, 0)
+        il.addWidget(body)
+        scroll.setWidget(inner)
+        lay.addWidget(scroll, 1)
+        close_btn = secondary_button("关闭")
+        close_btn.clicked.connect(dlg.accept)
+        lay.addWidget(close_btn, alignment=Qt.AlignRight)
+        dlg.exec_()
 
     # ==================== 定制培养计划 ====================
     def _build_master_plans(self, layout, container):
@@ -581,7 +697,7 @@ class MasterPagesMixin:
                 spin.setRange(0, 100)
                 spin.setDecimals(0)
                 spin.setValue(float(q.get("master_score") or q.get("ai_score") or 0))
-                spin.setFixedWidth(90)
+                spin.setFixedWidth(_scaled(90))
                 grade_row.addWidget(spin)
                 pass_btn = success_button("✅ 通过并保存")
                 pass_btn.clicked.connect(
@@ -713,16 +829,25 @@ def _mastery_bar(m: dict) -> QVBoxLayout:
     pct = 90 if level == "熟练" else 50 if level == "了解" else 20
     color = Color.SUCCESS if pct >= 90 else Color.WARNING if pct >= 50 else Color.DANGER
     box = QVBoxLayout()
-    box.setSpacing(3)
+    box.setSpacing(_scaled(3))
     lbl = QLabel(f'{m.get("dim_name", "")} — {level}')
-    lbl.setStyleSheet(f"color:{Color.TEXT};font-size:19.5px;font-weight:600;background:transparent;")
+    lbl.setStyleSheet(f"color:{Color.TEXT};font-size:{_scaled(19)}px;font-weight:600;background:transparent;")
     box.addWidget(lbl)
-    bar = QProgressBar()
-    bar.setMaximum(100)
-    bar.setValue(pct)
-    bar.setTextVisible(False)
-    bar.setStyleSheet(
-        f"QProgressBar{{border:none;border-radius:5px;background:#e9edf3;height:10px;}}"
-        f"QProgressBar::chunk{{background:{color};border-radius:5px;}}")
-    box.addWidget(bar)
+    box.addWidget(progress_bar(value=pct, maximum=100, color=color, height=10))
     return box
+
+
+def _point_title(p) -> str:
+    """取考点名称文本，三级容错：title 优先 → name 兜底 → 安全回退。
+
+    严禁把 dict 当字符串渲染（否则会显示成 {'id': 2, 'title': '风控校验', ...}
+    这种原始 JSON）。回退时若 p 为 dict 则用其 id 构造可读占位，否则截断到 30 字符。
+    """
+    if isinstance(p, dict):
+        name = p.get("title") or p.get("name")
+        if name:
+            return str(name)
+        pid = p.get("id")
+        return f"考点{pid}" if pid is not None else "未命名考点"
+    s = str(p).strip()
+    return s if s else "未命名考点"

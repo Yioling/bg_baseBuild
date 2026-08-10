@@ -7,10 +7,39 @@
 """
 from PyQt5.QtWidgets import (
     QLabel, QFrame, QVBoxLayout, QHBoxLayout, QPushButton, QWidget,
-    QGraphicsDropShadowEffect,
+    QGraphicsDropShadowEffect, QApplication,
 )
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QColor
+
+
+def screen_metrics() -> dict:
+    """获取当前屏幕可用尺寸并计算全局缩放系数（唯一取屏入口）。
+
+    返回字段：
+      width / height  当前屏幕可用宽 / 高（不含任务栏）
+      scale           全局缩放系数（相对 1080p 基准，clamp 0.82~1.25，步进 0.02）
+      wide            是否宽屏（width / height >= 1.6）
+      font_delta      字号增量（px）＝ round((scale - 1) * 6)
+    """
+    try:
+        geo = QApplication.primaryScreen().availableGeometry()
+        w, h = geo.width(), geo.height()
+    except Exception:
+        w, h = 1920, 1040
+    scale = max(0.82, min(1.25, round(h / 1040 / 0.02) * 0.02))
+    return {
+        "width": w,
+        "height": h,
+        "scale": scale,
+        "wide": w / max(h, 1) >= 1.6,
+        "font_delta": round((scale - 1) * 6),
+    }
+
+
+def _scaled(v) -> int:
+    """把某个基准像素值按当前屏幕缩放系数换算。"""
+    return int(v * screen_metrics()["scale"] + 0.5)
 
 
 # ==================== 设计令牌 ====================
@@ -111,10 +140,10 @@ QPushButton#btnGhost {{
     font-size: 20px;
 }}
 QPushButton#btnGhost:hover {{ color: {Color.PRIMARY_HOVER}; }}
-QPushButton#btnSuccess {{ background: {Color.SURFACE}; color: {Color.PRIMARY}; border: 1.5px solid {Color.PRIMARY}; }}
-QPushButton#btnSuccess:hover {{ background: {Color.PRIMARY_SOFT}; }}
-QPushButton#btnDanger {{ background-color: #991b1b; }}
-QPushButton#btnDanger:hover {{ background-color: #7f1616; }}
+QPushButton#btnSuccess {{ background-color: {Color.SUCCESS}; color: #ffffff; border: 1.5px solid {Color.SUCCESS}; }}
+QPushButton#btnSuccess:hover {{ background-color: #0d9668; }}
+QPushButton#btnDanger {{ background-color: {Color.SURFACE}; color: {Color.DANGER}; border: 1.5px solid {Color.DANGER}; }}
+QPushButton#btnDanger:hover {{ background-color: {Color.DANGER_SOFT}; }}
 
 /* 输入控件 */
 QLineEdit, QTextEdit, QComboBox {{
@@ -125,9 +154,15 @@ QLineEdit, QTextEdit, QComboBox {{
     background: white;
     color: {Color.TEXT};
     selection-background-color: {Color.PRIMARY};
+    selection-color: #ffffff;
 }}
 QLineEdit:focus, QTextEdit:focus, QComboBox:focus {{
-    border-color: {Color.PRIMARY};
+    border: 2px solid {Color.PRIMARY};
+    background: #fef9f9;
+}}
+QLineEdit:disabled, QTextEdit:disabled {{
+    background: #f5f2f2;
+    color: {Color.TEXT_MUTED};
 }}
 QComboBox::drop-down {{ border: none; width: 30px; }}
 QComboBox QAbstractItemView {{
@@ -154,8 +189,10 @@ QTableWidget {{
     alternate-background-color: #fdfafa;
 }}
 QTableWidget::item {{ padding: 14px; }}
+QTableWidget::item:hover {{ background: #fdf2f2; }}
+QTableWidget::item:selected {{ background: {Color.PRIMARY_SOFT}; color: {Color.PRIMARY}; }}
 QHeaderView::section {{
-    background: #faf5f5;
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #faf5f5, stop:1 #f2e9e9);
     border: none;
     border-bottom: 2px solid {Color.BORDER};
     padding: 14px;
@@ -286,15 +323,48 @@ def apply_shadow(widget: QWidget, blur: int = 24, dy: int = 6, alpha: int = 26):
     return widget
 
 
-def card(accent: str = None, padding: int = 26) -> QFrame:
-    """标准白色卡片容器。返回 QFrame（QWidget 子类），可安全 setStyleSheet。"""
-    f = QFrame()
-    f.setObjectName("card")
+def _card_qss(accent: str = None, padding: int = None, hover: bool = False) -> str:
+    """生成标准卡片 QFrame 样式串（默认/悬停两态），仅作用于 QFrame。"""
+    if padding is None:
+        padding = _scaled(26)
+    else:
+        padding = _scaled(padding)
+    border = "#f3c6c6" if hover else Color.BORDER
     border_left = f"border-left:4px solid {accent};" if accent else ""
-    f.setStyleSheet(
-        f"QFrame#card{{background:{Color.SURFACE};border:1px solid {Color.BORDER};"
+    return (
+        f"QFrame#card{{background:{Color.SURFACE};border:1px solid {border};"
         f"border-radius:{Radius.LG}px;padding:{padding}px;{border_left}}}"
     )
+
+
+def card(accent: str = None, padding: int = None, hoverable: bool = True) -> QFrame:
+    """标准白色卡片容器。返回 QFrame（QWidget 子类），可安全 setStyleSheet。
+
+    padding 缺省时按当前屏幕缩放系数自适应（默认基准 26px）。
+    hoverable=True 时带统一悬停反馈：边框变粉 + 阴影加深 + 轻微上移（样式仅作用于 QFrame）。
+    """
+    if padding is None:
+        padding = _scaled(26)
+    else:
+        padding = _scaled(padding)
+    f = QFrame()
+    f.setObjectName("card")
+    f._accent = accent
+    f._pad = padding
+    f.setStyleSheet(_card_qss(accent, padding, hover=False))
+    apply_shadow(f, blur=24, dy=6, alpha=26)
+
+    if hoverable:
+        def _hover_enter(_e):
+            f.setStyleSheet(_card_qss(accent, padding, hover=True))
+            apply_shadow(f, blur=30, dy=10, alpha=34)
+
+        def _hover_leave(_e):
+            f.setStyleSheet(_card_qss(accent, padding, hover=False))
+            apply_shadow(f, blur=24, dy=6, alpha=26)
+
+        f.enterEvent = _hover_enter
+        f.leaveEvent = _hover_leave
     return f
 
 
@@ -318,7 +388,7 @@ def _stat_card_qss(color: str, border_px: int = 4, bg: str = None) -> str:
     return (
         f"QFrame#card{{background:{bg or Color.SURFACE};"
         f"border:1px solid {Color.BORDER};border-radius:{Radius.LG}px;"
-        f"padding:28px;border-left:{border_px}px solid {color};}}"
+        f"padding:{_scaled(28)}px;border-left:{border_px}px solid {color};}}"
     )
 
 
@@ -329,19 +399,19 @@ def stat_card(value: str, label: str, color: str = Color.PRIMARY,
     clickable=True 时卡片可点击：手型光标、右下角 ▸ 提示、悬停/选中态。
     卡片额外挂载 set_selected(bool) 方法供调用方做互斥控制。
     """
-    f = card(accent=color, padding=28)
+    f = card(accent=color)
     lay = QVBoxLayout(f)
-    lay.setContentsMargins(8, 8, 8, 8)
-    lay.setSpacing(8)
+    lay.setContentsMargins(_scaled(8), _scaled(8), _scaled(8), _scaled(8))
+    lay.setSpacing(_scaled(8))
     v = QLabel(str(value))
     v.setStyleSheet(
-        f"font-size:43px;font-weight:800;color:{color};background:transparent;"
+        f"font-size:{_scaled(43)}px;font-weight:800;color:{color};background:transparent;"
     )
     v.setAlignment(Qt.AlignCenter)
     lay.addWidget(v)
     l = QLabel(label)
     l.setStyleSheet(
-        f"font-size:20px;color:{Color.TEXT_SUB};font-weight:500;background:transparent;"
+        f"font-size:{_scaled(20)}px;color:{Color.TEXT_SUB};font-weight:500;background:transparent;"
     )
     l.setAlignment(Qt.AlignCenter)
     lay.addWidget(l)
@@ -401,6 +471,8 @@ def title_label(text: str) -> QLabel:
 def subtitle_label(text: str) -> QLabel:
     l = QLabel(text)
     l.setObjectName("pageSubtitle")
+    # 用内联样式覆盖随屏字号（QSS 常量不能动态插值）
+    l.setStyleSheet(f"font-size:{_scaled(20)}px;background:transparent;")
     l.setWordWrap(True)
     return l
 
@@ -408,12 +480,13 @@ def subtitle_label(text: str) -> QLabel:
 def section_label(text: str) -> QLabel:
     l = QLabel(text)
     l.setObjectName("sectionTitle")
+    l.setStyleSheet(f"font-size:{_scaled(23)}px;background:transparent;")
     return l
 
 
 def hint_label(text: str, color: str = Color.TEXT_SUB) -> QLabel:
     l = QLabel(text)
-    l.setStyleSheet(f"color:{color};font-size:19px;background:transparent;")
+    l.setStyleSheet(f"color:{color};font-size:{_scaled(19)}px;background:transparent;")
     l.setWordWrap(True)
     return l
 
@@ -431,8 +504,8 @@ def guide_item(text: str, color: str = Color.TEXT) -> QLabel:
     """引导卡条目：比 hint_label 更大的字号，专供引导卡使用。"""
     l = QLabel(text)
     l.setStyleSheet(
-        f"color:{color};font-size:24px;font-weight:500;"
-        "padding-left:6px;background:transparent;"
+        f"color:{color};font-size:{_scaled(24)}px;font-weight:500;"
+        f"padding-left:{_scaled(6)}px;background:transparent;"
     )
     l.setWordWrap(True)
     return l
@@ -442,7 +515,7 @@ def badge(text: str, color: str = Color.PRIMARY, bg: str = Color.PRIMARY_SOFT) -
     l = QLabel(text)
     l.setStyleSheet(
         f"background:{bg};color:{color};border-radius:{Radius.PILL}px;"
-        f"padding:3px 12px;font-size:17.5px;font-weight:600;"
+        f"padding:{_scaled(3)}px {_scaled(12)}px;font-size:{_scaled(17)}px;font-weight:600;"
     )
     l.setAlignment(Qt.AlignCenter)
     return l
@@ -534,18 +607,56 @@ def ghost_button(text: str) -> QPushButton:
     return b
 
 
-def loading_label(text: str = "加载中...") -> QLabel:
-    l = QLabel(f"⏳ {text}")
-    l.setStyleSheet(f"color:{Color.TEXT_SUB};font-size:21px;padding:28px;background:transparent;")
-    l.setAlignment(Qt.AlignCenter)
-    return l
+def loading_label(text: str = "加载中...") -> QWidget:
+    """加载态容器：不确定进度条（QProgressBar range 0,0 动画）+ 文字。
+
+    返回 QWidget（遵守铁律），内部纵向排布；暴露 setText 转发到文字标签，
+    兼容既有 loading.setText(...) / hide() / deleteLater() 调用。
+    """
+    from PyQt5.QtWidgets import QProgressBar
+    wrap = QWidget()
+    lay = QVBoxLayout(wrap)
+    lay.setContentsMargins(_scaled(24), _scaled(20), _scaled(24), _scaled(20))
+    lay.setSpacing(_scaled(10))
+    bar = QProgressBar()
+    bar.setRange(0, 0)  # 不确定进度，横向动画
+    bar.setTextVisible(False)
+    bar.setFixedWidth(_scaled(220))
+    bar.setStyleSheet(
+        f"QProgressBar{{border:none;border-radius:{_scaled(3)}px;"
+        f"background:#f0e8e8;height:{_scaled(6)}px;}}"
+        f"QProgressBar::chunk{{background:{Color.PRIMARY};border-radius:{_scaled(3)}px;}}"
+    )
+    lay.addWidget(bar, 0, Qt.AlignCenter)
+    lbl = QLabel(f"⏳ {text}")
+    lbl.setStyleSheet(f"color:{Color.TEXT_SUB};font-size:{_scaled(20)}px;background:transparent;")
+    lbl.setAlignment(Qt.AlignCenter)
+    lay.addWidget(lbl, 0, Qt.AlignCenter)
+    wrap.setText = lambda t: lbl.setText(t)
+    wrap.set_word = lambda t: lbl.setText(t)
+    return wrap
 
 
-def empty_label(text: str = "暂无数据") -> QLabel:
-    l = QLabel(f"🗂  {text}")
-    l.setStyleSheet(f"color:{Color.TEXT_MUTED};font-size:21px;padding:32px;background:transparent;")
+def empty_label(text: str = "暂无数据") -> QFrame:
+    """空态容器：浅色圆角底卡 + 居中说明，比裸灰字更有"区域感"。"""
+    f = QFrame()
+    f.setStyleSheet(
+        f"QFrame#empty{{background:#f6f1f1;border:1px dashed {Color.BORDER};"
+        f"border-radius:{Radius.LG}px;padding:{_scaled(40)}px {_scaled(24)}px;}}"
+    )
+    el = QVBoxLayout(f)
+    el.setContentsMargins(0, 0, 0, 0)
+    el.setSpacing(_scaled(8))
+    icon = QLabel("🗂")
+    icon.setStyleSheet(f"font-size:{_scaled(30)}px;background:transparent;")
+    icon.setAlignment(Qt.AlignCenter)
+    el.addWidget(icon)
+    l = QLabel(text)
+    l.setStyleSheet(f"color:{Color.TEXT_MUTED};font-size:{_scaled(21)}px;background:transparent;")
     l.setAlignment(Qt.AlignCenter)
-    return l
+    l.setWordWrap(True)
+    el.addWidget(l)
+    return f
 
 
 def divider() -> QFrame:
@@ -553,3 +664,40 @@ def divider() -> QFrame:
     line.setFrameShape(QFrame.HLine)
     line.setStyleSheet(f"color:{Color.BORDER};background:{Color.BORDER};max-height:1px;")
     return line
+
+
+def progress_bar(value: int = 0, maximum: int = 100,
+                 color: str = Color.PRIMARY, height: int = None) -> "QProgressBar":
+    """统一进度条工厂：track/chunk 圆角与高度一致，三处复用。
+
+    height 缺省时按屏幕缩放（基准 14px）。
+    """
+    from PyQt5.QtWidgets import QProgressBar
+    if height is None:
+        height = _scaled(14)
+    else:
+        height = _scaled(height)
+    bar = QProgressBar()
+    bar.setMaximum(maximum)
+    bar.setValue(value)
+    bar.setTextVisible(False)
+    bar.setStyleSheet(
+        f"QProgressBar{{border:none;border-radius:{height // 2}px;"
+        f"background:#f0e8e8;height:{height}px;}}"
+        f"QProgressBar::chunk{{background:{color};border-radius:{height // 2}px;}}"
+    )
+    return bar
+
+
+def chip(text: str, color: str = Color.PRIMARY, bg: str = Color.PRIMARY_SOFT) -> QLabel:
+    """附件/标签小圆片：圆角柔和底 + 主色文字，靠 background 着色。
+
+    返回 QLabel（QWidget 子类），样式仅作用于自身，遵守铁律。
+    """
+    l = QLabel(text)
+    l.setStyleSheet(
+        f"background:{bg};color:{color};border-radius:{Radius.PILL}px;"
+        f"padding:{_scaled(6)}px {_scaled(14)}px;font-size:{_scaled(18)}px;font-weight:500;"
+    )
+    l.setAlignment(Qt.AlignCenter)
+    return l

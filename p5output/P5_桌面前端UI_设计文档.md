@@ -151,7 +151,7 @@
 
 | 角色 | 专属选项卡（pid） | 与公共页之差 |
 |------|------------------|--------------|
-| 师傅 master | 概览 / 投喂资料 / 知识库 / 徒弟管理 / 定制计划 / 批改检测 / 学情看板 + **进度排名** + 交流圈 + 通知 | 7 个师傅专属 + 进度排名(progress_view) |
+| 师傅 master | 概览 / 投喂资料 / 知识库 / 公共资料库 / 徒弟管理 / 定制计划 / 批改检测 / 学情看板 + **进度排名** + 交流圈 + 通知 | 8 个师傅专属 + 进度排名(progress_view) |
 | 徒弟 apprentice | 概览 / 摸底考试 / 学习计划 / 当日复习 / 错题本 / 同门战况 / 我的计划 + **进度排名** + 交流圈 + 通知 | 7 个徒弟专属 + 进度排名(progress_view) |
 | 管理员 admin | 概览 / 审核注册 / 课程库 / 用户管理 / 部门管理 / 操作日志 + **进度视图** + 交流圈 + 通知 | 6 个管理员专属 + 进度视图(admin_progress) |
 
@@ -159,9 +159,22 @@
 
 `QDialog` 固定 `660×980`，红白渐变背景，`_RED_WHITE_QSS` 仅作用于本对话框。整体字号较此前放大 5px（QLabel 14.5→19、loginTitle 28→33、loginSub/loginMsg 14→19、authBtn 17→22、tabBtn 16→21），输入框 `QLineEdit`/`QComboBox` 的**预览文字(placeholder)与输入文字字号同步放大至 19px，与"用户名"等标签字号一致**，输入框竖直内边距再 +3px（`16px→19px` 上下、左右 18px）避免文字被遮挡；dialog 外边距 `72/54/72/46`、根间距 22，登录表单间距 16、注册表单间距 12 且各列(标签↔输入框)间距 10、行内列间距 18。**注册表单（字段多）整体包入 `QScrollArea`，窗口高度不足时滚动而非压缩输入框**。顶部两个可勾选 `tabBtn`（登录/注册，互斥），点击切换内部 `QStackedWidget` 的两种独立表单；**底部提交按钮 `authBtn` 随模式变文案**（`_do_auth` 按 `currentIndex` 分流到 login / register 两个接口）。两个表单为**独立 Widget**，字段完全不同，分别绘制如下。
 
+> **登录身份模式（§0.4.1 新增）**：登录表单在"用户名/密码"之上增加一个**「登录身份」`QComboBox`（l_role）**，提供 徒弟 / 师傅 / 管理员 三种模式，以满足三种角色的功能区分。三种模式**字段完全相同**（仍为用户名 + 密码）——依据 `API_CONTRACT.md` 与 `backend/auth.py::login()`，`POST /api/login` 只接收 `{username, password}`，**角色由账号唯一确定**，故登录请求体不携带 `role`、不改后端。角色下拉的作用：① 视觉身份区分（各模式带不同图标/说明文字）；② **前端角色一致性校验**（若所选身份与账号实际角色不符，前端拦截提示，仅本地判断、不请求后端）。
+
 #### 0.4.1 登录 UI（_build_login_form，currentIndex=0）
 
-仅含用户名 + 密码两项，密码 `EchoMode=Password`，回车（`returnPressed`）直接触发登录。
+在"用户名/密码"之上增加 **「登录身份」`QComboBox`（l_role）**，提供 徒弟 / 师傅 / 管理员 三种模式。三模式**字段相同**（用户名 + 密码，密码 `EchoMode=Password`），回车（`returnPressed`）直接触发登录。
+
+**登录身份下拉规格（l_role）**：
+
+| 项 | 说明 |
+|----|------|
+| 选项 | `👤 徒弟` / `👤 师傅` / `👤 管理员`（value 分别为 `apprentice`/`master`/`admin`，与 `user.role` 对齐） |
+| 默认 | 徒弟（`apprentice`） |
+| 切换行为 | ① 更新输入框 `placeholder`（徒弟「输入学徒账号」/师傅「输入工号或用户名」/管理员「输入管理员账号」）；② 更新下方模式提示文案 |
+| 模式提示 | 徒弟：「登录后进入学习计划与复习」；师傅：「登录后管理徒弟与知识库」；管理员：「登录后管理审核与系统」 |
+| 一致性校验 | `_do_auth` 登录时对比 `l_role.currentData()` 与后端返回 `user.role`：不一致则 `_set_msg("该账号为{实际角色}，请切换对应身份登录", warn=True)` 拦截，不 `accept()` |
+| 请求体 | **仍只传 `{username, password}`**（`POST /api/login`，不改后端，角色由账号唯一确定） |
 
 ```
 ┌────────────────────────────────────┐
@@ -169,15 +182,19 @@
 │      师傅带徒 · 知识传承 · AI 加速   │  ← loginSub (19px/#9c8a8a)
 │  [ 登 录 ]     [ 注 册 ]            │  ← tabBtn(21px)：登录=选中(底部3px红下划线)
 │  ────────────────────────────────  │  ← tabLine(QFrame.HLine)
+│  登录身份                            │  ← 标签 19px
+│  [ 👤 徒弟  ▾ ]                     │  ← l_role (QComboBox, 19px, 徒弟/师傅/管理员)
 │  用户名                              │  ← 标签 19px
-│  [______________________________]  │  ← l_uname (QLineEdit, 19px, placeholder=输入用户名)
+│  [______________________________]  │  ← l_uname (QLineEdit, 19px, placeholder随身份切换)
 │  密码                                │  ← 标签 19px
 │  [______________________________]  │  ← l_pwd (19px, Password掩码, placeholder=输入密码)
-│                                     │
+│  💡 登录后进入学习计划与复习           │  ← roleTip (18px/#9c8a8a, 随身份切换文案)
 │                                     │  ← addStretch() 撑出底部空白
 └────────────────────────────────────┘
          (下接通用 消息区 + 提交按钮，见 0.4.3)
 ```
+
+> 接口：`POST /api/login`（请求体仅 `{username,password}`，与 §4 公共接口表一致）。角色一致性校验为**纯前端本地判断**，不新增端点、不改后端。
 
 #### 0.4.2 注册 UI（_build_register_form，currentIndex=1）
 
@@ -241,23 +258,61 @@
 
 ### 0.6 交流圈（SocialPagesMixin，三类共用）
 
-侧边栏"💬 交流圈"入口，发帖/列表/点赞/评论。
+侧边栏"💬 交流圈"入口，发帖/列表/点赞/评论/**上传图片/文件**。支持附件（图片 + 任意文件），发帖时附带附件，帖子卡展示并可下载。
 
 ```
 发帖区 (QGroupBox ✍️ 发帖)：
-┌──────────────────────────────────────────┐
-│ [ 分享想法、可 @同事…            ]          │  ← QTextEdit(84px)
-│ (消息)                          [ 发布 ]   │  ← 主按钮(右对齐)
-└──────────────────────────────────────────┘
-帖子卡 (card, padding14)：
-┌──────────────────────────────────────────┐
-│ 张三  [师傅]              2026-08-03 10:2 │  ← 15px/700+badge+灰时间
-│ 今天带徒复盘，订单幂等讲得不错 👍          │  ← 15.5px 正文
-│ 🤍 3    💬 1 评论                       │  ← ghost_button 点赞/评论
-└──────────────────────────────────────────┘
-         │ 点击"评论" → QDialog(440×460) 含 QScrollArea 评论列表 + 输入行
+┌────────────────────────────────────────────────┐
+│ [ 分享想法、可 @同事…                  ]          │  ← QTextEdit(84px)
+│ [🖼️ 上传图片] [📎 上传文件]  · 已选: 图1.png ×    │  ← 附件行(QHBoxLayout): 次要按钮 + chip
+│ (消息)                                [ 发布 ]   │  ← 主按钮(右对齐)
+└────────────────────────────────────────────────┘
+帖子卡 (card, padding22、行距10，放大以便阅读)：
+┌──────────────────────────────────────────────┐
+│ 张三  [师傅]                    2026-08-03 10:2  │  ← 作者24px/700 + badge20px + 灰时间20px
+│ 今天带徒复盘，订单幂等讲得不错 👍                 │  ← 正文25px
+│ ┌───────────────┐  📎 订单流程图.pdf             │  ← 附件区: 图片直接内嵌(300×210) + 文件chip22px
+│ │   (图片直接    │                                │          (点击下载)
+│ │    内嵌显示)   │                                │
+│ └───────────────┘                                │
+│ 🤍 3    💬 1 评论                                │  ← ghost_button 22px 点赞/评论
+└──────────────────────────────────────────────┘
+         │ 点击"评论" → QDialog(520×560) 含 QScrollArea 评论列表 + 输入行
 ```
-接口：`POST /api/posts`、`GET /api/posts`、`POST /api/posts/{id}/like`、`GET/POST /api/posts/{id}/comments`。
+
+> **帖子卡放大基准**（用户反馈文字/图片/附件名偏小后放大）：作者名 `20→24px`、角色徽章 `17.5→20px`、时间 `18→20px`、正文 `20.5→25px`、图片缩略 `200×140→300×210`、附件名 chip `18→22px`、点赞/评论 `20→22px`、card 内边距 `14→22px`、行距 `6→10px`、评论对话框 `440×460→520×560`。
+
+**附件上传交互（发帖区）**：
+
+| 项 | 说明 |
+|----|------|
+| 「🖼️ 上传图片」 | `QPushButton`(ghost) → `QFileDialog.getOpenFileNames()` 过滤图片（png/jpg/jpeg/gif/webp/bmp），多选 |
+| 「📎 上传文件」 | `QPushButton`(ghost) → `QFileDialog.getOpenFileNames()` 任意文件，多选 |
+| 已选附件 | 底部附件行以 **chip**（`QFrame#attachChip`：文件名 + `×` 移除按钮）展示；可重复添加、可移除；附加上限 9 个、单文件上限 20MB（超出 `post_msg` 提示并忽略） |
+| 发布流程 | 先逐个 `POST /api/attachments`（multipart 上传）取回 `{attachment_id,url}`，再 `POST /api/posts` 携带 `attachment_ids:[...]`；任一上传失败则整帖中止并提示 |
+| 发布中 | 附件行与发布按钮禁用，`post_msg` 显示"上传中…/发布中…" |
+
+**帖子卡附件展示（交互约定）**：
+
+| 附件类型 | 渲染 / 交互 |
+|----------|-------------|
+| 图片（`attachments[].mime` 以 `image/` 开头） | **在界面内直接内嵌显示**：`QLabel` 缩略图（`setPixmap` 按 `Qt.KeepAspectRatio` 缩放至 ≤200×140），加载即展示，**不弹窗**、不做点击跳转，仅做图片预览 |
+| 非图片文件 | chip `📎 {file_name}`（可附大小），**点击执行下载到本地**：`_api_call GET` 落盘桌面并 `os.startfile` 打开 |
+
+> 交互原则：**图片=直接展示；文件=点击下载**。图片不做放大弹窗（直接可见），文件不做内联预览（点击下载）。
+
+**接口契约（本次新增/扩展）**：
+
+| 方法 | 路径 | 守卫 | 请求体 | 响应关键字段 |
+|------|------|------|--------|--------------|
+| POST | `/api/attachments` | 登录 | multipart `file` | `{success,attachment_id,file_name,url,mime,size}` |
+| GET | `/api/attachments/{id}/content` | 登录 | — | 文件字节流（`application/octet-stream` / `image/*`） |
+| POST | `/api/posts`（扩展） | 登录 | `{content,author_name?,attachment_ids?:[...]}` | `{success,post_id}` |
+| GET | `/api/posts`（扩展） | 登录 | — | `posts[]` 增加 `attachments:[{id,file_name,url,mime,size}]`（`mime`/`size` 由后端按文件名推断补充，**必含**，前端据此区分图片/文件） |
+
+> **数据层**：复用 `db.py` 已预建的 `post_attachments` 表（`id, post_id, file_name, url, created_at`）。文件实体存磁盘目录（`backend/data/post_files/`，按 attachment_id 命名），数据库仅存元数据；`POST /api/attachments` 先落盘再写表返回 `attachment_id`，`POST /api/posts` 收到 `attachment_ids` 后把附件绑定到新帖 `post_id`。
+>
+> **实现边界**（仅限本次修改）：本地二进制附件逻辑**并入既有 `backend/social.py`**（新增 `upload_attachment_binary` / `get_attachment_content` / `bind_attachments_to_post`，与既有外链 `add_post_attachment` 互补，不新增模块），在 `main.py` 装配 `/api/attachments` 与扩展 `/api/posts` 读写附件；不在 `auth.py`/`db.py`/`schemas.py` 新增字段。前端在 `ui/social.py` 实现上传 UI 与附件展示，`ui/theme.py` 新增 `chip()` 工厂。中文文件名经前端 percent-encode、后端 `unquote` 还原，规避 multipart 对非 ASCII 文件名的解析乱码；附件字节流经 `Content-Disposition` 下载（中文名用 `filename*` RFC 5987 编码）。
 
 ### 0.7 进度三视图（ProgressPagesMixin._build_progress_view，三类共用）
 
@@ -276,15 +331,191 @@
 ```
 接口：`GET /api/progress/company`、`GET /api/progress/department`、`GET /api/progress/same-master`。
 
+### 0.8 屏幕自适应布局系统（Screen-Adaptive Layout，本次新增）
+
+> **背景**：当前主窗口尺寸 `1520×940`、侧边栏 `378px`、内容区外边距 `(52,28,52,20)`、各组件字号/内边距/弹窗尺寸均为**硬编码定值**。在小屏笔记本（1366×768）或高分屏上，要么内容被裁切、要么左右大量留白，布局不够自适应、不够舒展。本次引入**运行时读取当前屏幕可用尺寸 → 动态计算窗口/侧边栏/内容区/组件缩放系数 → 美化布局与 UI**。
+
+#### 0.8.1 屏幕尺寸获取（运行时，非硬编码）
+
+新增 `ui/theme.py::screen_metrics()` 模块级函数，作为**唯一取屏入口**，替代散落各处的 `QApplication.desktop().availableGeometry()`：
+
+| 返回字段 | 含义 | 取值 |
+|----------|------|------|
+| `width` / `height` | 当前屏幕**可用**宽/高（不含任务栏） | `QApplication.primaryScreen().availableGeometry()` |
+| `scale` | 全局缩放系数（相对 1080p 基准） | `clamp(height / 1040, 0.82, 1.25)`，步进 `0.02` 取整 |
+| `wide` | 是否为宽屏布局 | `width / height >= 1.6` |
+| `font_delta` | 字号增量（px） | `round((scale - 1) * 6)` |
+
+> 约定：`scale` 是**唯一定尺**。凡需随屏幕变化的尺寸（外边距、卡片内边距、弹窗、进度条宽、头像列宽等）一律乘以 `scale` 取整；字号用 `font_delta` 做整体 +N 放大（与既有"全局放大 5px"理念一致，做二次适配）。
+
+#### 0.8.2 主窗口尺寸与侧边栏（main_window.py）
+
+`MainWindow.__init__` 改为按屏幕计算，替换硬编码：
+
+| 项 | 原（硬编码） | 新（动态） |
+|----|--------------|------------|
+| 窗口宽 | `1520` | `min(round(屏宽 × 0.92), 1660)` |
+| 窗口高 | `940` | `min(round(屏高 × 0.90), 1000)` |
+| 最小宽 | `1200` | `max(1120, round(屏宽 × 0.72))` |
+| 最小高 | `780` | `round(屏高 × 0.72)` |
+| 侧边栏宽 | 固定 `378px` | `round(300 × scale)`（约 246~375px），仍 `min/max-width` 双设 |
+
+> 窗口默认**铺满当前屏幕约九成**，避免小屏窗口溢出任务栏、大屏左右留白过多。侧边栏随 `scale` 缩放，导航按钮 `min-height:56px`、`padding:18px 32px` 保持，字号 20px 随 `font_delta` 微调。
+
+#### 0.8.3 内容区与页面画布（main_window.py `_create_page`）
+
+| 项 | 原 | 新 |
+|----|-----|-----|
+| 内容区外边距 | `(52, 28, 52, 20)` | `(round(48×scale), round(26×scale), round(48×scale), round(20×scale))` |
+| 页面画布上边距 | `(0,14,0,0)` | `(0, round(14×scale), 0, 0)` |
+| 画布内纵向间距 | `20` | `round(20×scale)` |
+
+> 宽屏（`wide=True`）时，内容区横向外边距**额外 +8px**，进一步压缩左右留白，让卡片更饱满。
+
+#### 0.8.4 组件与字号随屏缩放（theme.py 工厂）
+
+所有通用工厂内可调尺寸改为按 `scale` 缩放：
+
+| 组件 | 原 | 新 |
+|------|-----|-----|
+| `card` 默认内边距 | 26 | `round(26×scale)` |
+| `stat_card` 内边距 | 28 | `round(28×scale)` |
+| 指标卡数值字号 | 43 | `round(43×scale)` |
+| 指标卡说明字号 | 20 | `round(20×scale)+font_delta` |
+| `title_label` | 35 | 不随屏（页面标题恒定醒目） |
+| `subtitle_label` | 20.5 | `round(20.5×scale)` |
+| `hint_label`/`guide_item` | 19 / 24 | `round(x×scale)` |
+| 弹窗默认尺寸 | 硬编码 | 见 §0.8.5 |
+| `badge`/`chip` 内边距 | 3,12 / 6,14 | `round(x×scale)` |
+
+> **字号上限约束**：任一随屏字号 `max(尺寸, 屏幕≥2160 时上限)` 不设硬上限，仅靠 `scale` 截断在 `[0.82,1.25]` 内，保证大字不溢出、小屏可读。
+
+#### 0.8.5 弹窗尺寸自适应
+
+散落各处的 `QDialog.resize(W,H)` 统一改为按 `scale` 缩放（`round(W×scale), round(H×scale)`）：
+
+| 弹窗 | 位置 | 原尺寸 |
+|------|------|--------|
+| 课程详情 | `master.py _view_library_course` | 560×600 |
+| 任务检测 | `apprentice.py _open_quiz_dialog` | 460×340 |
+| 评论 | `social.py _show_comments` | 440×460 |
+| 重绑师傅 | `admin.py _open_rebind_dialog` | 360×160 |
+| 登录/注册 | `login.py` | 660×980（另见 §0.4，随屏缩放） |
+
+> 登录/注册对话框（660×980）在 `scale<1` 时同步缩放，避免小屏放不下。
+
+#### 0.8.6 各页面布局美化（本次一并落地）
+
+在屏幕自适应基础上，对以下页面做**布局与留白美化**：
+
+1. **师傅概览**（§1.1）：指标卡 `QGridLayout` 列间距 14→`round(16×scale)`；详情区固定高 `clamp(屏高×0.34, 300, 460)` 保留，但基准改为 `screen_metrics().height`；知识点条形图维度名 `setFixedWidth(220)` → `round(220×scale)`。
+2. **徒弟概览**（§2.1）：错题统计 `stat_card` 保持两列，卡片内边距随屏缩放。
+3. **进度排行**（§0.7）：进度条 `setFixedWidth(140)` → `round(140×scale)`；姓名/分数列 `min-width` 随屏缩放。
+4. **投喂资料**（§1.2）：三个 `QGroupBox` 上边距统一，按钮与消息行对齐；输入框随屏留白。
+5. **知识库**（§1.3）：维度卡内边距 14→`round(14×scale)`，标题 21→`round(21×scale)`。
+6. **交流圈**（§0.6）：帖子卡内边距 22→`round(22×scale)`，图片缩略 300×210 随 `scale` 等比放大。
+7. **表格**（徒弟管理/审核等）：`QTableWidget` 单元格内边距 `padding:14px`→`round(14×scale)`，行高随屏微调。
+
+> **实现边界**：全部改动限定在 `ui/` 包（theme.py / main_window.py / master.py / apprentice.py / admin.py / social.py / notify.py / progress.py / login.py），**不改后端**（main.py / db.py / auth.py / schemas.py）。新增 `screen_metrics()` 为唯一取屏入口，其余模块 `import` 复用；保留既有"工厂返回 QWidget、样式只作用于 QWidget"铁律。
+
+### 0.9 UI 美化增强（UI Polish，本次新增）
+
+> **总原则**：全部为**样式 / 动效 / 微交互**改动，**不动 API、不动数据流、不动布局结构**；遵守"样式只作用于 QWidget、不对 QLayout setStyleSheet"铁律；延续 §0.8 的 `_scaled()` 屏幕自适应。共 11 项，按"全局观感提升最大"优先。
+
+#### 0.9.1 侧边栏品牌感增强（sidebar）
+
+| 改动 | 说明 |
+|------|------|
+| Logo 衬底 | `logo` 上方包一层半透明白圆角块（`rgba(255,255,255,.08)`，圆角 `Radius.MD`），"🔥 薪火"更醒目 |
+| 底部信息分隔线 | `userinfo` 与导航区之间加 `QFrame.HLine`（`rgba(255,255,255,.12)`），隔离用户信息区 |
+
+#### 0.9.2 卡片 hover 微交互（theme.card）
+
+给**通用 `card()`** 增加统一悬停反馈（此前仅 `stat_card` 有）：
+
+| 状态 | 表现 |
+|------|------|
+| 默认 | 现有白卡 + 阴影 `blur 24 / dy 6` |
+| 悬停 | 边框 `#f3c6c6` + 阴影 `blur 30 / dy 10 / alpha 34` + 轻微上移视觉 |
+| 实现 | `card()` 内挂 `enterEvent/leaveEvent`（复用 `stat_card` 模式，样式仅作用于 QFrame） |
+
+> 影响面：知识库维度卡、徒弟卡、帖子卡、通知卡、课程卡、排行卡、日志卡等全部列表型卡片，点击暗示更清晰。
+
+#### 0.9.3 空态 / 加载态观感提升（theme）
+
+| 组件 | 改动 |
+|------|------|
+| `empty_label` | 居中字变大、加浅色圆角底卡（`#f6f1f1` + `Radius.LG` + 内边距），比裸灰字更有"区域感" |
+| `loading_label` | 用**不确定 `QProgressBar`**（`setRange(0,0)` 动画横条）替代转圈 emoji，观感更现代 |
+
+#### 0.9.4 表单 placeholder 灰化 + 焦点态（GLOBAL_QSS）
+
+| 项 | 改动 |
+|----|------|
+| placeholder | `QLineEdit/QTextEdit/QComboBox` 的 placeholder 统一 `#9ca3af`（浅灰，区别于输入色 `#1f1a1a`） |
+| 焦点态 | focus 时 `background:#fef9f9` 淡红底 + 2px 红边 + 轻投影（`QGraphicsDropShadowEffect` 由 GLOBAL_QSS 用 `border` 实现，不新增投影层） |
+
+> 说明：placeholder 灰化用 QSS `placeholder-text-color`；焦点态仅改 border/background 颜色，不改布局。
+
+#### 0.9.5 按钮语义色收紧（theme 工厂 + GLOBAL_QSS）
+
+纠正当前语义色混用（`success_button` 是红框红字、`danger_button` 是深红实底，主/次/幽灵层次不清）：
+
+| 按钮 | 现状 | 新样式 |
+|------|------|--------|
+| `primary_button` 主按钮 | 红底白字 | **保持**（红底白字，`Color.PRIMARY` 实底） |
+| `secondary_button` 次要 | 白底灰边 | **保持**（白底 `Color.BORDER` 边 + 灰字） |
+| `ghost_button` 幽灵 | 透明红字 | **保持**（透明底 + 红字） |
+| `success_button` 成功 | 红框红字 | **改为** 绿实底白字（`Color.SUCCESS`） |
+| `danger_button` 危险 | 深红实底 | **改为** 白底红字红边（与次要对齐，仅强调危险） |
+
+> 语义各归其位：成功=绿、危险=红、主=品牌红实底、次=灰、幽灵=透明。
+
+#### 0.9.6 页面头部品牌红 accent 线（main_window._create_page）
+
+副标题下方、画布上方加一条品牌红短线（`3px × 40px`，`Color.PRIMARY`）作页眉锚点，增强标题层次。
+
+#### 0.9.7 页面切换淡入动画（main_window）
+
+`_load_page` 完成构建后，对 `pageInner` 做 `QPropertyAnimation`（`opacity` 0→1，180ms）+ 轻微上移 8px，替代生硬的 QStackedWidget 直接切换。
+
+> 实现：`pageInner` 需允许 `setGraphicsEffect`（动画作用在 `QGraphicsOpacityEffect` 上），完成后移除 effect 避免叠加。
+
+#### 0.9.8 通知未读红点徽章（main_window + notify）
+
+侧边栏"🔔 通知"按钮右上角加**红色圆点徽章**（`QPushButton` 文本前缀红点），未读 >0 时显示、=0 时隐藏，替代/补充当前 `(N)` 文案；红点带轻微闪烁（`QPropertyAnimation` opacity 0.4↔1）。
+
+#### 0.9.9 进度条统一工厂（theme.progress_bar）
+
+新增 `progress_bar(value, color=Color.PRIMARY, height=None)` 工厂，统一 track/chunk 圆角与高度，替换三处散落的进度条：
+- 概览知识维度条形图（品牌红）
+- 学情看板 / 摸底 `_mastery_bar`（绿/橙/红）
+- 进度排行 `progress.py`（透明 track）
+
+#### 0.9.10 弹窗内容统一样式（theme + 各弹窗）
+
+各 `QDialog` 内容区套用统一底色 `Color.BG` + 内边距，标题行统一用 `section_label`，关闭/确认按钮统一 `secondary_button` / `primary_button`；消除系统默认白底突兀感。涉及：课程详情、任务检测、评论、重绑师傅、学习计划 PDF 等。
+
+#### 0.9.11 表格行 hover / 选中态（GLOBAL_QSS）
+
+| 项 | 改动 |
+|----|------|
+| 行 hover | `QTableWidget::item:hover` 淡红底 `#fdf2f2` |
+| 行选中 | `QTableWidget::item:selected` 品牌红软底 `#fef2f2` + 红字 |
+| 表头 | 加轻微下渐变 `#faf5f5→#f2e9e9` |
+| 单元格 | 垂直居中 `alignment`（QSS `item { padding }` 保持） |
+
+> 纯样式，不改表格数据结构与 API。
+
 ---
 
 ## 一、师傅（Master）UI 设计
 
-侧边栏条目（`ROLE_PAGES["master"]`）：概览 / 投喂资料 / 知识库 / 徒弟管理 / 定制计划 / 批改检测 / 学情看板 / **进度排名(复用 §0.7)** / **交流圈(复用 §0.6)** / **通知(复用 §0.5)**。
+侧边栏条目（`ROLE_PAGES["master"]`）：概览 / 投喂资料 / 知识库 / 公共资料库 / 徒弟管理 / 定制计划 / 批改检测 / 学情看板 / **进度排名(复用 §0.7)** / **交流圈(复用 §0.6)** / **通知(复用 §0.5)**。
 
 ### 1.0 师傅侧边栏（完整选项卡 UI）
 
-骨架同 §0.3，按 `ROLE_PAGES["master"]` 生成 10 个导航按钮，首个"概览"默认选中。
+骨架同 §0.3，按 `ROLE_PAGES["master"]` 生成 11 个导航按钮，首个"概览"默认选中。
 
 ```
 ┌────────────────┐
@@ -294,6 +525,7 @@
 │  📊 概览(选中)    │  ← master_overview (默认勾选)
 │  📥 投喂资料      │  ← master_ingest
 │  🧠 知识库        │  ← master_knowledge
+│  📖 公共资料库    │  ← master_library (新增 §1.8)
 │  👥 徒弟管理      │  ← master_apprentices
 │  📝 定制计划      │  ← master_plans
 │  ✅ 批改检测      │  ← master_grading
@@ -389,7 +621,9 @@
 │  …(每维度一段, 整体置于 QScrollArea, 最多渲染 60 个考点)     │
 └────────────────────────────────────────────────────────────┘
 ```
-数据：`dimensions[].points[]`；每个考点渲染为 `badge(name, Color.SUCCESS)`。
+数据：`dimensions[].points[]`；每个考点渲染为 `badge(point_name, Color.SUCCESS)`。
+
+> **考点名称字段容错约定（本次新增）**：后端 `points[]` 元素 dict 的考点名称字段**约定为 `title`**（与 `GET /api/master/knowledge` 实际返回一致，元素含 `id / dimension_id / title / content / source_ref / level`）。前端取值按 **`title` 优先 → `name` 兜底 → 退回 `str(point)` 但需截断到 30 字符防字典展开** 三级容错，**严禁直接把 dict 当字符串渲染**（否则会渲染出 `{'id': 2, 'dimension_id': 1, 'title': '风控校验', ...}` 这种原始 JSON，破坏 badge 视觉）。该约定与 §1.3 知识库维度卡考点行、§1.1 概览图 ① 条形图考点计数等所有读取 `points[].title/name` 的地方统一。
 
 **③ 徒弟数量** — 徒弟名册卡片墙（每行 3 个）
 
@@ -537,6 +771,8 @@ addStretch(1)                    ← 弹簧兜底，吸收所有剩余空间
 ```
 接口：`GET /api/master/knowledge`(main内联)、`POST /api/master/refine`(P3)`{success,...}`。
 
+> **考点行字段容错（与 §1.1.2 ② 统一）**：知识库维度卡的考点行 `· {point_title}  [{level}]` 中，**`point_title` 同样遵循 `title` 优先 → `name` 兜底 → 截断到 30 字符**三级容错，避免后端字段微调导致整张维度卡变成 JSON 字典列表。
+
 ### 1.4 徒弟管理（_build_master_apprentices）
 
 顶部"➕ 创建徒弟账号"`QGroupBox`（用户名+密码+创建按钮），下方"👥 我的徒弟"表格（`QTableWidget`，列：用户名/创建时间/操作[生成计划]）。
@@ -607,6 +843,57 @@ addStretch(1)                    ← 弹簧兜底，吸收所有剩余空间
 └──────────────────────────────────────┘
 ```
 接口：`GET /api/master/apprentices`(auth)、`GET /api/master/dashboard/{apprentice_id}`(main内联)`{mastery,assessments,reviews}`。
+
+### 1.8 公司公共资料库（_build_master_library）
+
+管理员在「课程库」(§3.3，`admin_courses`) 维护的公司预置课程，是**给师傅的默认预置知识库**。师傅端新增独立页面查看这些公共课程资源（文档 / 视频 / 链接 / 题库四类），并可展开查看完整内容。
+
+```
+📖 公司公共资料库  (标题)
+由管理员维护的公司统一课程资源，可查看与使用
+┌─ 公共资料库 (QGroupBox) ────────────────────────────────┐
+│ [ 📄 筛选类型: 全部 ▾ ]                (课程数量 N 条)     │  ← QComboBox 按 type 过滤
+│ ┌─ 课程卡 (card, accent=红, padding20) ───────────────┐  │
+│ │ 📚 订单系统实战                        [document]     │  │  ← 标题24px/700 + type badge
+│ │ 从订单创建到支付对账全流程，含幂等设计与状态机            │  │  ← 摘要19px 灰(截断两行)
+│ │ [📖 查看详情]   [➕ 加入我的知识库]                  │  │  ← 查看详情 + 一键加入知识库
+│ └───────────────────────────────────────────────────┘  │
+│  …(课程卡逐张列出, 空态 empty_label)                     │
+└───────────────────────────────────────────────────────┘
+```
+
+**交互与规格**：
+
+| 项 | 说明 |
+|----|------|
+| 数据源 | `GET /api/master/courses`（复用 §1.5 定制计划同源接口，`courses_list_courses`），返回 `{success, courses:[{id,title,type,content,...}]}` |
+| 类型筛选 | 顶部 `QComboBox` 提供 `全部 / document / video / link / quiz_bank`，选择后仅展示对应类型课程（本地过滤，不新增请求） |
+| 课程卡 | `card`(padding20, accent=红)：标题 `24px/700` + 类型 `badge`；下方摘要 `19px` 灰（`content` 前 60 字，超长省略） |
+| 查看详情 | 点击「📖 查看详情」→ `QDialog(560×600)`，标题 + 类型 badge + `QScrollArea` 内展示 `content` 全文（`setWordWrap`），仅供查看，不可编辑 |
+| **一键加入我的知识库** | 课程卡「➕ 加入我的知识库」按钮：`POST /api/master/library/import/{course_id}`，把课程文本按投喂流程纳入**当前师傅**的默认知识库（写 `kb_sources`/`kb_documents` + 分块嵌入），随后可在「知识库」页对该课程精炼。**幂等**：重复点击提示"已加入你的知识库"，不重复入库 |
+| 已加入态 | 页面加载时 `GET /api/master/library/imported` 返回已纳入本师傅知识库的课程 id 集合；已加入的课程卡按钮变为 `ghost_button("✓ 已加入", 禁用)` |
+| 空态 | 无课程时 `empty_label("暂无公共资料，请联系管理员在课程库添加")` |
+| 定位 | 与"定制计划选课"共用课程库数据；本页专注**查看/浏览 + 一键纳入个人知识库**，定制计划页专注**勾选入计划** |
+
+```
+┌─ 查看详情 QDialog (560×600) ────────────────┐
+│ 📚 订单系统实战                  [document]  │  ← 标题24px/700 + type badge
+│ ┌─ QScrollArea(全文) ────────────────────┐  │
+│ │ 从订单创建到支付对账全流程，                    │  │  ← content 全文, wordWrap
+│ │ …(完整内容滚动阅读)                       │  │
+│ └───────────────────────────────────────┘  │
+└───────────────────────────────────────────┘
+```
+
+接口（仅本次修改新增/扩展）：
+
+| 方法 | 路径 | 守卫 | 说明 |
+|------|------|------|------|
+| GET | `/api/master/courses` | 师傅 | 复用既有，返回公司课程库 `{courses:[{id,title,type,content}]}` |
+| GET | `/api/master/library/imported` | 师傅 | 返回已纳入本师傅知识库的课程 id 集合 `{imported:[course_id,...]}` |
+| POST | `/api/master/library/import/{course_id}` | 师傅 | 把课程内容按投喂流程纳入当前师傅默认知识库，幂等（已纳入返回 success + already=true） |
+
+> **后端实现**：在 `backend/ingest.py` 或独立函数实现"课程→知识库"投喂：取 `courses` 行 → 生成 `kb_sources`（来源标为 `course:{id}`）+ `kb_documents.raw_text` → 复用分块/嵌入逻辑入库 → 返回 success。`main.py` 装配上述 3 个路由。**不新增 `courses` 表字段、不改 `refiner.py`**（精炼仍只读师傅已投喂的 `kb_documents`，课程加入后即自然可精炼）。
 
 ---
 
@@ -884,14 +1171,20 @@ addStretch(1)                    ← 弹簧兜底，吸收所有剩余空间
 
 ### 3.6 操作日志（_build_admin_logs）
 
-日志卡片列表（时间线式），每行：动作(品牌红) + 目标类型/ID/详情 + 灰时间。
+日志卡片列表（时间线式），每行：动作(品牌红) + 目标类型/ID/详情 + 灰时间。**各段以空格间隔**；**仅展示用户操作日志，隐藏系统自动任务日志**。
 
 ```
 ┌─ 日志卡 (card, padding8) ────────────┐
-│ [approve]  用户 #12 审核通过  2026-08-03│  ← 红字(700)+黑字+灰时间
+│ [approve]  用户 #12 审核通过  2026-08-03│  ← 红字(700)+空格+黑字(目标+detail)+空格+灰时间
 └──────────────────────────────────────┘
 ```
 接口：`GET /api/admin/logs`(P6)`{logs:[{action,target_type,target_id,detail,created_at}]}`。
+
+> **审核日志写入**（仅本次修改）：`POST /api/admin/approve` / `reject` 现在**真正写入 `admin_logs`**——`action='approve'`（`detail='审核通过'`）/ `action='reject'`（`detail='驳回'`），`target_type='user'`、`target_id`=被审核用户 id、`admin_id`=操作管理员 id。
+>
+> **隐藏系统日志**：`GET /api/admin/logs` 过滤掉系统自动任务日志（`self_purify` 等 `admin_id=0` 或系统类 `action`），**只返回用户操作日志**，界面不再出现看不懂的 JSON 文本。
+>
+> **渲染规范**：`[action]`(红700) + **两空格** + `{target_type} #{target_id}  {detail}`(黑字) + **两空格** + `{created_at}`(灰)。审核日志 detail 为友好短文本（审核通过/驳回），无需截断。
 
 ### 3.7 复用说明（管理员侧）
 

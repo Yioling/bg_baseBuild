@@ -12,7 +12,7 @@ from ui.api import BASE_URL
 from ui.theme import (
     Color, card, stat_card, section_label, hint_label, loading_label,
     empty_label, primary_button, success_button, secondary_button, badge,
-    guide_item, GUIDE_BOX_TITLE_QSS,
+    guide_item, GUIDE_BOX_TITLE_QSS, screen_metrics, _scaled,
 )
 from ui.master import _mastery_bar
 
@@ -51,7 +51,7 @@ class ApprenticePagesMixin:
             a_count = len(res.get("assess_mistakes", [])) if res.get("success") else 0
             r_count = len(res.get("review_mistakes", [])) if res.get("success") else 0
             grid = QGridLayout()
-            grid.setSpacing(14)
+            grid.setSpacing(_scaled(16))
             grid.addWidget(stat_card(a_count + r_count, "错题总数", Color.DANGER), 0, 0)
             grid.addWidget(stat_card(f"{a_count} / {r_count}", "考试 / 复习错题", Color.WARNING), 0, 1)
             layout.addLayout(grid)
@@ -511,8 +511,10 @@ class ApprenticePagesMixin:
     def _open_quiz_dialog(self, plan_item_id, title):
         dlg = QDialog(self)
         dlg.setWindowTitle(f"任务检测 — {title}")
-        dlg.resize(460, 340)
+        dlg.resize(_scaled(460), _scaled(340))
+        dlg.setStyleSheet(f"QDialog{{background:{Color.BG};}}")
         dl = QVBoxLayout(dlg)
+        dl.setContentsMargins(_scaled(20), _scaled(16), _scaled(20), _scaled(16))
         dl.setSpacing(10)
         dl.addWidget(hint_label("写下你对本课程的学习总结 / 答题内容，提交后 AI 初评，师傅终评。"))
         answer = QTextEdit()

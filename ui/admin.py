@@ -9,7 +9,7 @@ from ui.api import BASE_URL
 from ui.theme import (
     Color, card, stat_card, section_label, hint_label, loading_label,
     empty_label, primary_button, success_button, secondary_button,
-    danger_button, badge,
+    danger_button, badge, screen_metrics, _scaled,
 )
 
 _ROLE_NAMES = {"admin": "管理员", "master": "师傅", "apprentice": "徒弟"}
@@ -29,7 +29,7 @@ class AdminPagesMixin:
         def show(res):
             loading.hide()
             grid = QGridLayout()
-            grid.setSpacing(14)
+            grid.setSpacing(_scaled(16))
             cards = [
                 (res.get("total_apprentices", 0), "徒弟数", Color.DANGER),
                 (res.get("total_masters", 0), "师傅数", Color.PRIMARY),
@@ -175,7 +175,7 @@ class AdminPagesMixin:
                 uf = card(padding=10)
                 ul = QHBoxLayout(uf)
                 name = QLabel(u.get("full_name") or u.get("username", ""))
-                name.setStyleSheet(f"font-weight:700;color:{Color.TEXT};font-size:20px;min-width:110px;background:transparent;")
+                name.setStyleSheet(f"font-weight:700;color:{Color.TEXT};font-size:{_scaled(20)}px;min-width:{_scaled(110)}px;background:transparent;")
                 ul.addWidget(name)
                 ul.addWidget(badge(_ROLE_NAMES.get(u.get("role"), u.get("role", "")),
                                    Color.PRIMARY, Color.PRIMARY_SOFT))
@@ -199,8 +199,10 @@ class AdminPagesMixin:
     def _open_rebind_dialog(self, apprentice_id, name, masters):
         dlg = QDialog(self)
         dlg.setWindowTitle(f"重绑师傅 — {name}")
-        dlg.resize(360, 160)
+        dlg.resize(_scaled(360), _scaled(160))
+        dlg.setStyleSheet(f"QDialog{{background:{Color.BG};}}")
         dl = QVBoxLayout(dlg)
+        dl.setContentsMargins(_scaled(20), _scaled(16), _scaled(20), _scaled(16))
         dl.setSpacing(10)
         dl.addWidget(hint_label("为该徒弟选择新的师傅："))
         combo = QComboBox()
@@ -287,12 +289,16 @@ class AdminPagesMixin:
                 act = QLabel(f'[{lg.get("action", "")}]')
                 act.setStyleSheet(f"color:{Color.PRIMARY};font-size:19px;font-weight:700;min-width:110px;background:transparent;")
                 ll.addWidget(act)
+                # 目标 + 详情，各段空格间隔；超长 detail 截断（系统 JSON 数百字）防重叠
+                detail_raw = str(lg.get("detail", "") or "")
+                if len(detail_raw) > 60:
+                    detail_raw = detail_raw[:60] + "…"
                 detail = QLabel(
-                    f'{lg.get("target_type", "")} #{lg.get("target_id", "")}  {lg.get("detail", "")}')
+                    f'  {lg.get("target_type", "")} #{lg.get("target_id", "")}  {detail_raw}')
                 detail.setStyleSheet(f"color:{Color.TEXT};font-size:19px;background:transparent;")
                 ll.addWidget(detail)
                 ll.addStretch()
-                t = QLabel(str(lg.get("created_at", ""))[:19])
+                t = QLabel(f"  {str(lg.get('created_at', ''))[:19]}")
                 t.setStyleSheet(f"color:{Color.TEXT_MUTED};font-size:18px;background:transparent;")
                 ll.addWidget(t)
                 layout.addWidget(lf)

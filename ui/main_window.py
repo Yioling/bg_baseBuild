@@ -27,14 +27,18 @@ if _fh is not None:
                                        datefmt="%H:%M:%S"))
     logging.getLogger().addHandler(_fh)
 
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import Qt, QPropertyAnimation, QEasingCurve
 from PyQt5.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel,
     QStackedWidget, QScrollArea, QButtonGroup, QFrame,
 )
+from PyQt5.QtWidgets import QGraphicsOpacityEffect
 
 from ui.api import ApiMixin, BASE_URL
-from ui.theme import GLOBAL_QSS, SIDEBAR_QSS, Color, title_label, subtitle_label
+from ui.theme import (
+    GLOBAL_QSS, SIDEBAR_QSS, Color, title_label, subtitle_label,
+    screen_metrics, _scaled,
+)
 from ui.master import MasterPagesMixin
 from ui.apprentice import ApprenticePagesMixin
 from ui.admin import AdminPagesMixin
@@ -54,6 +58,7 @@ PAGE_META = {
     "master_overview": ("📊  概览", "师傅概览", "知识库与徒弟培养一览"),
     "master_ingest": ("📥  投喂资料", "投喂资料", "上传本地资料或抓取博客，构建专属知识库"),
     "master_knowledge": ("🧠  知识库", "知识库管理", "AI 精炼生成知识维度与考点树"),
+    "master_library": ("📖  公共资料库", "公司公共资料库", "查看管理员维护的公司统一预置课程资源"),
     "master_apprentices": ("👥  徒弟管理", "徒弟管理", "创建徒弟账号并生成学习计划"),
     "master_plans": ("📝  定制计划", "定制培养计划", "从课程库勾选课程，为徒弟定制培养路径"),
     "master_grading": ("✅  批改检测", "批改检测", "查看徒弟检测提交，终评改分与进度判定"),
@@ -77,7 +82,7 @@ ROLE_PAGES = {
         "social_posts", "notifications",
     ],
     "master": [
-        "master_overview", "master_ingest", "master_knowledge",
+        "master_overview", "master_ingest", "master_knowledge", "master_library",
         "master_apprentices", "master_plans", "master_grading",
         "master_dashboard", "progress_view", "social_posts", "notifications",
     ],
@@ -100,8 +105,11 @@ class MainWindow(
         self.token = token
         self.user = user
         self.setWindowTitle("薪火 · 师傅带徒 AI 导师系统")
-        self.resize(1520, 940)
-        self.setMinimumSize(1200, 780)
+        m = screen_metrics()
+        self.resize(min(round(m["width"] * 0.92), 1660),
+                    min(round(m["height"] * 0.90), 1000))
+        self.setMinimumSize(max(1120, round(m["width"] * 0.72)),
+                            round(m["height"] * 0.72))
         self.setStyleSheet(GLOBAL_QSS)
         self._init_ui()
         self._refresh_notify_badge()
@@ -136,17 +144,40 @@ class MainWindow(
     def _build_sidebar(self, page_ids) -> QWidget:
         sidebar = QWidget()
         sidebar.setObjectName("sidebar")
-        sidebar.setStyleSheet(SIDEBAR_QSS)
+        fd = screen_metrics()["font_delta"]
+        # 追加随屏字号覆盖（QSS 常量不能插值，此处叠加内联规则）
+        sidebar.setStyleSheet(SIDEBAR_QSS + (
+            f"QWidget#sidebar QPushButton{{font-size:{20 + fd}px;}}"
+            f"QLabel#logo{{font-size:{29 + fd}px;padding:0;}}"
+            f"QLabel#logoSub{{font-size:{17 + fd}px;padding:2px 0 0 0;}}"
+            f"QLabel#userName{{font-size:{24 + fd}px;}}"
+            f"QLabel#userRole{{font-size:{19 + fd}px;}}"
+        ))
+        # 覆盖 SIDEBAR_QSS 的固定 378px，随屏幕缩放（约 246~375px）
+        sidebar.setFixedWidth(_scaled(300))
         lay = QVBoxLayout(sidebar)
         lay.setContentsMargins(0, 0, 0, 14)
         lay.setSpacing(0)
 
+        # Logo 圆底衬底（半透明白，增强品牌感，仅作用于 QWidget）
+        logo_wrap = QWidget()
+        logo_wrap.setObjectName("logoWrap")
+        logo_wrap.setStyleSheet(
+            "QWidget#logoWrap{background:rgba(255,255,255,0.08);"
+            "border-radius:16px;margin:20px 24px 0 24px;}"
+        )
+        logo_lay = QVBoxLayout(logo_wrap)
+        logo_lay.setContentsMargins(8, 6, 8, 6)
+        logo_lay.setSpacing(0)
         logo = QLabel("🔥  薪火")
         logo.setObjectName("logo")
-        lay.addWidget(logo)
+        logo.setAlignment(Qt.AlignCenter)
+        logo_lay.addWidget(logo)
         logo_sub = QLabel("师傅带徒 · AI 导师系统")
         logo_sub.setObjectName("logoSub")
-        lay.addWidget(logo_sub)
+        logo_sub.setAlignment(Qt.AlignCenter)
+        logo_lay.addWidget(logo_sub)
+        lay.addWidget(logo_wrap)
 
         self.sidebar_btns = []
         self.nav_btn_map = {}
@@ -163,6 +194,13 @@ class MainWindow(
 
         lay.addStretch()
 
+        # 用户信息区上方分隔线（半透明白）
+        sep = QFrame()
+        sep.setFrameShape(QFrame.HLine)
+        sep.setStyleSheet("color:rgba(255,255,255,0.14);background:rgba(255,255,255,0.14);"
+                          "max-height:1px;margin:4px 24px;")
+        lay.addWidget(sep)
+
         role_names = {"admin": "管理员", "master": "师傅", "apprentice": "徒弟"}
         display = self.user.get("full_name") or self.user.get("username", "")
         role_text = role_names.get(self.user.get("role"), self.user.get("role") or "")
@@ -175,7 +213,7 @@ class MainWindow(
 
         avatar = QLabel("👤")
         avatar.setObjectName("userAvatar")
-        avatar.setFixedWidth(34)
+        avatar.setFixedWidth(_scaled(34))
         avatar.setAlignment(Qt.AlignLeft | Qt.AlignTop)
         info_lay.addWidget(avatar, 0, Qt.AlignTop)
 
@@ -210,12 +248,22 @@ class MainWindow(
         page = QWidget()
         page.setStyleSheet(f"background: {Color.BG};")
         v = QVBoxLayout(page)
-        v.setContentsMargins(52, 28, 52, 20)
-        v.setSpacing(8)
+        m = screen_metrics()
+        # 宽屏额外压缩左右留白，让卡片更饱满
+        wide_extra = _scaled(8) if m["wide"] else 0
+        hm = _scaled(48) + wide_extra
+        v.setContentsMargins(hm, _scaled(26), hm, _scaled(20))
+        v.setSpacing(_scaled(8))
 
         _, page_title, page_sub = PAGE_META[pid]
         v.addWidget(title_label(page_title))
         v.addWidget(subtitle_label(page_sub))
+
+        # 页面头部品牌红 accent 短线（页眉锚点）
+        accent_line = QFrame()
+        accent_line.setFixedSize(_scaled(44), _scaled(3))
+        accent_line.setStyleSheet(f"background:{Color.PRIMARY};border:none;border-radius:2px;")
+        v.addWidget(accent_line)
 
         scroll = QScrollArea()
         scroll.setObjectName("pageScroll")
@@ -228,8 +276,8 @@ class MainWindow(
         inner.setObjectName("pageInner")
         inner.setProperty("pageId", pid)
         il = QVBoxLayout(inner)
-        il.setContentsMargins(0, 14, 0, 0)
-        il.setSpacing(20)
+        il.setContentsMargins(0, _scaled(14), 0, 0)
+        il.setSpacing(_scaled(20))
         scroll.setWidget(inner)
 
         v.addWidget(scroll, 1)
@@ -241,6 +289,24 @@ class MainWindow(
         if pid in self.nav_btn_map:
             self.nav_btn_map[pid].setChecked(True)
         self._load_page(pid)
+        self._fade_in_page(pid)
+
+    def _fade_in_page(self, pid):
+        """页面切换淡入：opacity 0→1 + 轻微上移，完成后移除 effect 避免叠加。"""
+        inner = self._page_inners.get(pid)
+        if not inner:
+            return
+        eff = QGraphicsOpacityEffect(inner)
+        eff.setOpacity(0.0)
+        inner.setGraphicsEffect(eff)
+        anim = QPropertyAnimation(eff, b"opacity", self)
+        anim.setDuration(180)
+        anim.setStartValue(0.0)
+        anim.setEndValue(1.0)
+        anim.setEasingCurve(QEasingCurve.OutCubic)
+        anim.finished.connect(lambda: inner.setGraphicsEffect(None))
+        anim.start()
+        self._fade_anim = anim
 
     def _load_page(self, pid):
         inner = self._page_inners[pid]
@@ -264,6 +330,7 @@ class MainWindow(
             "master_overview": self._build_master_overview,
             "master_ingest": self._build_master_ingest,
             "master_knowledge": self._build_master_knowledge,
+            "master_library": self._build_master_library,
             "master_apprentices": self._build_master_apprentices,
             "master_plans": self._build_master_plans,
             "master_grading": self._build_master_grading,
@@ -308,7 +375,13 @@ class MainWindow(
             if not btn:
                 return
             unread = res.get("unread_count", 0) if res.get("success") else 0
-            btn.setText(f"🔔  通知  ({unread})" if unread else "🔔  通知")
+            # 未读 >0 时以红点 + 计数提示；=0 时恢复常规铃铛图标
+            if unread:
+                btn.setText(f"🔴  通知  ({unread})")
+                btn.setToolTip(f"有 {unread} 条未读通知")
+            else:
+                btn.setText("🔔  通知")
+                btn.setToolTip("暂无未读通知")
 
         self._api_call("GET", f"{BASE_URL}/api/notifications", callback=on_res)
 
