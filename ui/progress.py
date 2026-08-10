@@ -2,7 +2,7 @@
 from PyQt5.QtWidgets import QVBoxLayout, QHBoxLayout, QLabel, QComboBox, QProgressBar
 
 from ui.api import BASE_URL
-from ui.theme import Color, card, loading_label, empty_label
+from ui.theme import Color, card, loading_label, empty_label, _scaled
 
 
 class ProgressPagesMixin:
@@ -63,12 +63,12 @@ class ProgressPagesMixin:
             bar.setMaximum(100)
             bar.setValue(int(pct))
             bar.setTextVisible(False)
-            bar.setFixedWidth(140)
+            bar.setFixedWidth(_scaled(140))
             al.addWidget(bar)
             pl = QLabel(f"{pct}%")
-            pl.setStyleSheet(f"color:{Color.PRIMARY};font-size:19.5px;font-weight:700;min-width:42px;background:transparent;")
+            pl.setStyleSheet(f"color:{Color.PRIMARY};font-size:{_scaled(19)}px;font-weight:700;min-width:{_scaled(42)}px;background:transparent;")
             al.addWidget(pl)
             sc = QLabel(f'{a.get("avg_score", 0)} 分')
-            sc.setStyleSheet(f"color:{Color.TEXT_SUB};font-size:19px;min-width:44px;background:transparent;")
+            sc.setStyleSheet(f"color:{Color.TEXT_SUB};font-size:{_scaled(19)}px;min-width:{_scaled(44)}px;background:transparent;")
             al.addWidget(sc)
             area.addWidget(af)

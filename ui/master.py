@@ -36,6 +36,7 @@ from ui.theme import (
     Color, card, stat_card, section_label, hint_label, loading_label,
     empty_label, primary_button, success_button, secondary_button, badge, refine_button,
     apply_shadow, ingest_button, guide_item, GUIDE_BOX_TITLE_QSS,
+    screen_metrics, _scaled,
 )
 
 
@@ -67,8 +68,8 @@ class MasterPagesMixin:
             detail_scroll.setWidgetResizable(True)
             detail_scroll.setFrameShape(QFrame.NoFrame)
             detail_scroll.setWidget(detail)
-            avail = QApplication.desktop().availableGeometry().height()
-            detail_scroll.setFixedHeight(max(300, min(460, int(avail * 0.34))))
+            avail = screen_metrics()["height"]
+            detail_scroll.setFixedHeight(max(_scaled(300), min(_scaled(460), int(avail * 0.34))))
 
             self._ov_cards = {}
 
@@ -88,7 +89,7 @@ class MasterPagesMixin:
                 builder(detail_lay)
 
             grid = QGridLayout()
-            grid.setSpacing(14)
+            grid.setSpacing(_scaled(16))
             cards = [
                 (dim_count, "知识维度", Color.PRIMARY, "dims"),
                 (pt_count, "知识点", Color.SUCCESS, "points"),
@@ -145,21 +146,21 @@ class MasterPagesMixin:
             rl.setSpacing(12)
             name = QLabel(d.get("name", "未命名"))
             name.setStyleSheet(
-                f"font-size:19px;color:{Color.TEXT};background:transparent;")
-            name.setFixedWidth(220)
+                f"font-size:{_scaled(19)}px;color:{Color.TEXT};background:transparent;")
+            name.setFixedWidth(_scaled(220))
             name.setWordWrap(True)
             rl.addWidget(name)
             bar = QProgressBar()
             bar.setMaximum(max_pt)
             bar.setValue(n)
             bar.setTextVisible(False)
-            bar.setFixedHeight(20)
+            bar.setFixedHeight(_scaled(20))
             rl.addWidget(bar, 1)
             cnt = QLabel(str(n))
             cnt.setStyleSheet(
-                f"font-size:19px;font-weight:700;color:{Color.PRIMARY};"
+                f"font-size:{_scaled(19)}px;font-weight:700;color:{Color.PRIMARY};"
                 "background:transparent;")
-            cnt.setFixedWidth(48)
+            cnt.setFixedWidth(_scaled(48))
             cnt.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
             rl.addWidget(cnt)
             lay.addWidget(row)
@@ -192,7 +193,7 @@ class MasterPagesMixin:
             for p in pts:
                 if shown >= 60:
                     break
-                pname = p.get("name", str(p)) if isinstance(p, dict) else str(p)
+                pname = _point_title(p)
                 wl.addWidget(badge(pname, Color.SUCCESS, Color.SUCCESS_SOFT), row_i, col)
                 shown += 1
                 col += 1
@@ -349,16 +350,17 @@ class MasterPagesMixin:
                 dl = QVBoxLayout(df)
                 dl.setSpacing(6)
                 name = QLabel(d.get("name", ""))
-                name.setStyleSheet(f"font-weight:700;font-size:21px;color:{Color.TEXT};background:transparent;")
+                name.setStyleSheet(f"font-weight:700;font-size:{_scaled(21)}px;color:{Color.TEXT};background:transparent;")
                 dl.addWidget(name)
                 if d.get("description"):
                     desc = QLabel(d["description"])
-                    desc.setStyleSheet(f"color:{Color.TEXT_SUB};font-size:19px;background:transparent;")
+                    desc.setStyleSheet(f"color:{Color.TEXT_SUB};font-size:{_scaled(19)}px;background:transparent;")
                     desc.setWordWrap(True)
                     dl.addWidget(desc)
                 for p in d.get("points", []):
-                    row = QLabel(f'· {p.get("title", "")}  [{p.get("level", "")}]')
-                    row.setStyleSheet(f"color:{Color.TEXT};font-size:19.5px;padding-left:6px;background:transparent;")
+                    lvl = p.get("level", "") if isinstance(p, dict) else ""
+                    row = QLabel(f'· {_point_title(p)}  [{lvl}]')
+                    row.setStyleSheet(f"color:{Color.TEXT};font-size:{_scaled(19)}px;padding-left:{_scaled(6)}px;background:transparent;")
                     dl.addWidget(row)
                 result_area.addWidget(df)
 
@@ -520,7 +522,7 @@ class MasterPagesMixin:
         """弹窗查看课程完整内容（只读）。"""
         dlg = QDialog(self)
         dlg.setWindowTitle(course.get("title", "课程详情"))
-        dlg.resize(560, 600)
+        dlg.resize(_scaled(560), _scaled(600))
         lay = QVBoxLayout(dlg)
         lay.setSpacing(12)
         head = QHBoxLayout()
@@ -696,7 +698,7 @@ class MasterPagesMixin:
                 spin.setRange(0, 100)
                 spin.setDecimals(0)
                 spin.setValue(float(q.get("master_score") or q.get("ai_score") or 0))
-                spin.setFixedWidth(90)
+                spin.setFixedWidth(_scaled(90))
                 grade_row.addWidget(spin)
                 pass_btn = success_button("✅ 通过并保存")
                 pass_btn.clicked.connect(
@@ -828,16 +830,32 @@ def _mastery_bar(m: dict) -> QVBoxLayout:
     pct = 90 if level == "熟练" else 50 if level == "了解" else 20
     color = Color.SUCCESS if pct >= 90 else Color.WARNING if pct >= 50 else Color.DANGER
     box = QVBoxLayout()
-    box.setSpacing(3)
+    box.setSpacing(_scaled(3))
     lbl = QLabel(f'{m.get("dim_name", "")} — {level}')
-    lbl.setStyleSheet(f"color:{Color.TEXT};font-size:19.5px;font-weight:600;background:transparent;")
+    lbl.setStyleSheet(f"color:{Color.TEXT};font-size:{_scaled(19)}px;font-weight:600;background:transparent;")
     box.addWidget(lbl)
     bar = QProgressBar()
     bar.setMaximum(100)
     bar.setValue(pct)
     bar.setTextVisible(False)
     bar.setStyleSheet(
-        f"QProgressBar{{border:none;border-radius:5px;background:#e9edf3;height:10px;}}"
+        f"QProgressBar{{border:none;border-radius:5px;background:#e9edf3;height:{_scaled(10)}px;}}"
         f"QProgressBar::chunk{{background:{color};border-radius:5px;}}")
     box.addWidget(bar)
     return box
+
+
+def _point_title(p) -> str:
+    """取考点名称文本，三级容错：title 优先 → name 兜底 → 安全回退。
+
+    严禁把 dict 当字符串渲染（否则会显示成 {'id': 2, 'title': '风控校验', ...}
+    这种原始 JSON）。回退时若 p 为 dict 则用其 id 构造可读占位，否则截断到 30 字符。
+    """
+    if isinstance(p, dict):
+        name = p.get("title") or p.get("name")
+        if name:
+            return str(name)
+        pid = p.get("id")
+        return f"考点{pid}" if pid is not None else "未命名考点"
+    s = str(p).strip()
+    return s if s else "未命名考点"

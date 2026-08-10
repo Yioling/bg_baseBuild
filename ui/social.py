@@ -13,6 +13,7 @@ from ui.api import BASE_URL
 from ui.theme import (
     Color, card, hint_label, loading_label, empty_label,
     primary_button, ghost_button, badge, secondary_button, chip,
+    screen_metrics, _scaled,
 )
 
 _ROLE_NAMES = {"admin": "管理员", "master": "师傅", "apprentice": "徒弟"}
@@ -28,7 +29,7 @@ class SocialPagesMixin:
         gl = QVBoxLayout(g)
         gl.setSpacing(8)
         post_input = QTextEdit()
-        post_input.setMaximumHeight(84)
+        post_input.setMaximumHeight(_scaled(84))
         post_input.setPlaceholderText("分享你的想法、学习心得，可 @同事 提醒 TA…")
         gl.addWidget(post_input)
 
@@ -174,7 +175,7 @@ class SocialPagesMixin:
                         if mime.startswith("image/") and url:
                             # 图片：直接在界面内嵌显示（缩略图），不弹窗、无点击交互
                             th = QLabel()
-                            th.setFixedSize(300, 210)
+                            th.setFixedSize(_scaled(300), _scaled(210))
                             th.setStyleSheet(f"border:1px solid {Color.BORDER};border-radius:10px;"
                                              "background:#f7f2f2;font-size:20px;color:#9ca3af;")
                             th.setAlignment(Qt.AlignCenter)
@@ -278,7 +279,7 @@ class SocialPagesMixin:
                 return
             pm = QPixmap()
             if pm.loadFromData(r["data"]):
-                lbl.setPixmap(pm.scaled(300, 210, Qt.KeepAspectRatio,
+                lbl.setPixmap(pm.scaled(_scaled(300), _scaled(210), Qt.KeepAspectRatio,
                                         Qt.SmoothTransformation))
             else:
                 lbl.setText("无法预览")
@@ -326,7 +327,7 @@ class SocialPagesMixin:
     def _show_comments(self, post_id):
         dlg = QDialog(self)
         dlg.setWindowTitle("评论")
-        dlg.resize(440, 460)
+        dlg.resize(_scaled(440), _scaled(460))
         dl = QVBoxLayout(dlg)
         dl.setSpacing(10)
 

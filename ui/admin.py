@@ -9,7 +9,7 @@ from ui.api import BASE_URL
 from ui.theme import (
     Color, card, stat_card, section_label, hint_label, loading_label,
     empty_label, primary_button, success_button, secondary_button,
-    danger_button, badge,
+    danger_button, badge, screen_metrics, _scaled,
 )
 
 _ROLE_NAMES = {"admin": "管理员", "master": "师傅", "apprentice": "徒弟"}
@@ -29,7 +29,7 @@ class AdminPagesMixin:
         def show(res):
             loading.hide()
             grid = QGridLayout()
-            grid.setSpacing(14)
+            grid.setSpacing(_scaled(16))
             cards = [
                 (res.get("total_apprentices", 0), "徒弟数", Color.DANGER),
                 (res.get("total_masters", 0), "师傅数", Color.PRIMARY),
@@ -175,7 +175,7 @@ class AdminPagesMixin:
                 uf = card(padding=10)
                 ul = QHBoxLayout(uf)
                 name = QLabel(u.get("full_name") or u.get("username", ""))
-                name.setStyleSheet(f"font-weight:700;color:{Color.TEXT};font-size:20px;min-width:110px;background:transparent;")
+                name.setStyleSheet(f"font-weight:700;color:{Color.TEXT};font-size:{_scaled(20)}px;min-width:{_scaled(110)}px;background:transparent;")
                 ul.addWidget(name)
                 ul.addWidget(badge(_ROLE_NAMES.get(u.get("role"), u.get("role", "")),
                                    Color.PRIMARY, Color.PRIMARY_SOFT))
@@ -199,7 +199,7 @@ class AdminPagesMixin:
     def _open_rebind_dialog(self, apprentice_id, name, masters):
         dlg = QDialog(self)
         dlg.setWindowTitle(f"重绑师傅 — {name}")
-        dlg.resize(360, 160)
+        dlg.resize(_scaled(360), _scaled(160))
         dl = QVBoxLayout(dlg)
         dl.setSpacing(10)
         dl.addWidget(hint_label("为该徒弟选择新的师傅："))

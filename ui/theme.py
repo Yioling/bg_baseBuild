@@ -7,10 +7,39 @@
 """
 from PyQt5.QtWidgets import (
     QLabel, QFrame, QVBoxLayout, QHBoxLayout, QPushButton, QWidget,
-    QGraphicsDropShadowEffect,
+    QGraphicsDropShadowEffect, QApplication,
 )
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QColor
+
+
+def screen_metrics() -> dict:
+    """获取当前屏幕可用尺寸并计算全局缩放系数（唯一取屏入口）。
+
+    返回字段：
+      width / height  当前屏幕可用宽 / 高（不含任务栏）
+      scale           全局缩放系数（相对 1080p 基准，clamp 0.82~1.25，步进 0.02）
+      wide            是否宽屏（width / height >= 1.6）
+      font_delta      字号增量（px）＝ round((scale - 1) * 6)
+    """
+    try:
+        geo = QApplication.primaryScreen().availableGeometry()
+        w, h = geo.width(), geo.height()
+    except Exception:
+        w, h = 1920, 1040
+    scale = max(0.82, min(1.25, round(h / 1040 / 0.02) * 0.02))
+    return {
+        "width": w,
+        "height": h,
+        "scale": scale,
+        "wide": w / max(h, 1) >= 1.6,
+        "font_delta": round((scale - 1) * 6),
+    }
+
+
+def _scaled(v) -> int:
+    """把某个基准像素值按当前屏幕缩放系数换算。"""
+    return int(v * screen_metrics()["scale"] + 0.5)
 
 
 # ==================== 设计令牌 ====================
@@ -286,8 +315,15 @@ def apply_shadow(widget: QWidget, blur: int = 24, dy: int = 6, alpha: int = 26):
     return widget
 
 
-def card(accent: str = None, padding: int = 26) -> QFrame:
-    """标准白色卡片容器。返回 QFrame（QWidget 子类），可安全 setStyleSheet。"""
+def card(accent: str = None, padding: int = None) -> QFrame:
+    """标准白色卡片容器。返回 QFrame（QWidget 子类），可安全 setStyleSheet。
+
+    padding 缺省时按当前屏幕缩放系数自适应（默认基准 26px）。
+    """
+    if padding is None:
+        padding = _scaled(26)
+    else:
+        padding = _scaled(padding)
     f = QFrame()
     f.setObjectName("card")
     border_left = f"border-left:4px solid {accent};" if accent else ""
@@ -318,7 +354,7 @@ def _stat_card_qss(color: str, border_px: int = 4, bg: str = None) -> str:
     return (
         f"QFrame#card{{background:{bg or Color.SURFACE};"
         f"border:1px solid {Color.BORDER};border-radius:{Radius.LG}px;"
-        f"padding:28px;border-left:{border_px}px solid {color};}}"
+        f"padding:{_scaled(28)}px;border-left:{border_px}px solid {color};}}"
     )
 
 
@@ -329,19 +365,19 @@ def stat_card(value: str, label: str, color: str = Color.PRIMARY,
     clickable=True 时卡片可点击：手型光标、右下角 ▸ 提示、悬停/选中态。
     卡片额外挂载 set_selected(bool) 方法供调用方做互斥控制。
     """
-    f = card(accent=color, padding=28)
+    f = card(accent=color)
     lay = QVBoxLayout(f)
-    lay.setContentsMargins(8, 8, 8, 8)
-    lay.setSpacing(8)
+    lay.setContentsMargins(_scaled(8), _scaled(8), _scaled(8), _scaled(8))
+    lay.setSpacing(_scaled(8))
     v = QLabel(str(value))
     v.setStyleSheet(
-        f"font-size:43px;font-weight:800;color:{color};background:transparent;"
+        f"font-size:{_scaled(43)}px;font-weight:800;color:{color};background:transparent;"
     )
     v.setAlignment(Qt.AlignCenter)
     lay.addWidget(v)
     l = QLabel(label)
     l.setStyleSheet(
-        f"font-size:20px;color:{Color.TEXT_SUB};font-weight:500;background:transparent;"
+        f"font-size:{_scaled(20)}px;color:{Color.TEXT_SUB};font-weight:500;background:transparent;"
     )
     l.setAlignment(Qt.AlignCenter)
     lay.addWidget(l)
@@ -401,6 +437,8 @@ def title_label(text: str) -> QLabel:
 def subtitle_label(text: str) -> QLabel:
     l = QLabel(text)
     l.setObjectName("pageSubtitle")
+    # 用内联样式覆盖随屏字号（QSS 常量不能动态插值）
+    l.setStyleSheet(f"font-size:{_scaled(20)}px;background:transparent;")
     l.setWordWrap(True)
     return l
 
@@ -408,12 +446,13 @@ def subtitle_label(text: str) -> QLabel:
 def section_label(text: str) -> QLabel:
     l = QLabel(text)
     l.setObjectName("sectionTitle")
+    l.setStyleSheet(f"font-size:{_scaled(23)}px;background:transparent;")
     return l
 
 
 def hint_label(text: str, color: str = Color.TEXT_SUB) -> QLabel:
     l = QLabel(text)
-    l.setStyleSheet(f"color:{color};font-size:19px;background:transparent;")
+    l.setStyleSheet(f"color:{color};font-size:{_scaled(19)}px;background:transparent;")
     l.setWordWrap(True)
     return l
 
@@ -431,8 +470,8 @@ def guide_item(text: str, color: str = Color.TEXT) -> QLabel:
     """引导卡条目：比 hint_label 更大的字号，专供引导卡使用。"""
     l = QLabel(text)
     l.setStyleSheet(
-        f"color:{color};font-size:24px;font-weight:500;"
-        "padding-left:6px;background:transparent;"
+        f"color:{color};font-size:{_scaled(24)}px;font-weight:500;"
+        f"padding-left:{_scaled(6)}px;background:transparent;"
     )
     l.setWordWrap(True)
     return l
@@ -442,7 +481,7 @@ def badge(text: str, color: str = Color.PRIMARY, bg: str = Color.PRIMARY_SOFT) -
     l = QLabel(text)
     l.setStyleSheet(
         f"background:{bg};color:{color};border-radius:{Radius.PILL}px;"
-        f"padding:3px 12px;font-size:17.5px;font-weight:600;"
+        f"padding:{_scaled(3)}px {_scaled(12)}px;font-size:{_scaled(17)}px;font-weight:600;"
     )
     l.setAlignment(Qt.AlignCenter)
     return l
@@ -536,14 +575,16 @@ def ghost_button(text: str) -> QPushButton:
 
 def loading_label(text: str = "加载中...") -> QLabel:
     l = QLabel(f"⏳ {text}")
-    l.setStyleSheet(f"color:{Color.TEXT_SUB};font-size:21px;padding:28px;background:transparent;")
+    l.setStyleSheet(f"color:{Color.TEXT_SUB};font-size:{_scaled(21)}px;"
+                    f"padding:{_scaled(28)}px;background:transparent;")
     l.setAlignment(Qt.AlignCenter)
     return l
 
 
 def empty_label(text: str = "暂无数据") -> QLabel:
     l = QLabel(f"🗂  {text}")
-    l.setStyleSheet(f"color:{Color.TEXT_MUTED};font-size:21px;padding:32px;background:transparent;")
+    l.setStyleSheet(f"color:{Color.TEXT_MUTED};font-size:{_scaled(21)}px;"
+                    f"padding:{_scaled(32)}px;background:transparent;")
     l.setAlignment(Qt.AlignCenter)
     return l
 
@@ -563,7 +604,7 @@ def chip(text: str, color: str = Color.PRIMARY, bg: str = Color.PRIMARY_SOFT) ->
     l = QLabel(text)
     l.setStyleSheet(
         f"background:{bg};color:{color};border-radius:{Radius.PILL}px;"
-        f"padding:6px 14px;font-size:18px;font-weight:500;"
+        f"padding:{_scaled(6)}px {_scaled(14)}px;font-size:{_scaled(18)}px;font-weight:500;"
     )
     l.setAlignment(Qt.AlignCenter)
     return l

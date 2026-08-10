@@ -331,6 +331,93 @@
 ```
 接口：`GET /api/progress/company`、`GET /api/progress/department`、`GET /api/progress/same-master`。
 
+### 0.8 屏幕自适应布局系统（Screen-Adaptive Layout，本次新增）
+
+> **背景**：当前主窗口尺寸 `1520×940`、侧边栏 `378px`、内容区外边距 `(52,28,52,20)`、各组件字号/内边距/弹窗尺寸均为**硬编码定值**。在小屏笔记本（1366×768）或高分屏上，要么内容被裁切、要么左右大量留白，布局不够自适应、不够舒展。本次引入**运行时读取当前屏幕可用尺寸 → 动态计算窗口/侧边栏/内容区/组件缩放系数 → 美化布局与 UI**。
+
+#### 0.8.1 屏幕尺寸获取（运行时，非硬编码）
+
+新增 `ui/theme.py::screen_metrics()` 模块级函数，作为**唯一取屏入口**，替代散落各处的 `QApplication.desktop().availableGeometry()`：
+
+| 返回字段 | 含义 | 取值 |
+|----------|------|------|
+| `width` / `height` | 当前屏幕**可用**宽/高（不含任务栏） | `QApplication.primaryScreen().availableGeometry()` |
+| `scale` | 全局缩放系数（相对 1080p 基准） | `clamp(height / 1040, 0.82, 1.25)`，步进 `0.02` 取整 |
+| `wide` | 是否为宽屏布局 | `width / height >= 1.6` |
+| `font_delta` | 字号增量（px） | `round((scale - 1) * 6)` |
+
+> 约定：`scale` 是**唯一定尺**。凡需随屏幕变化的尺寸（外边距、卡片内边距、弹窗、进度条宽、头像列宽等）一律乘以 `scale` 取整；字号用 `font_delta` 做整体 +N 放大（与既有"全局放大 5px"理念一致，做二次适配）。
+
+#### 0.8.2 主窗口尺寸与侧边栏（main_window.py）
+
+`MainWindow.__init__` 改为按屏幕计算，替换硬编码：
+
+| 项 | 原（硬编码） | 新（动态） |
+|----|--------------|------------|
+| 窗口宽 | `1520` | `min(round(屏宽 × 0.92), 1660)` |
+| 窗口高 | `940` | `min(round(屏高 × 0.90), 1000)` |
+| 最小宽 | `1200` | `max(1120, round(屏宽 × 0.72))` |
+| 最小高 | `780` | `round(屏高 × 0.72)` |
+| 侧边栏宽 | 固定 `378px` | `round(300 × scale)`（约 246~375px），仍 `min/max-width` 双设 |
+
+> 窗口默认**铺满当前屏幕约九成**，避免小屏窗口溢出任务栏、大屏左右留白过多。侧边栏随 `scale` 缩放，导航按钮 `min-height:56px`、`padding:18px 32px` 保持，字号 20px 随 `font_delta` 微调。
+
+#### 0.8.3 内容区与页面画布（main_window.py `_create_page`）
+
+| 项 | 原 | 新 |
+|----|-----|-----|
+| 内容区外边距 | `(52, 28, 52, 20)` | `(round(48×scale), round(26×scale), round(48×scale), round(20×scale))` |
+| 页面画布上边距 | `(0,14,0,0)` | `(0, round(14×scale), 0, 0)` |
+| 画布内纵向间距 | `20` | `round(20×scale)` |
+
+> 宽屏（`wide=True`）时，内容区横向外边距**额外 +8px**，进一步压缩左右留白，让卡片更饱满。
+
+#### 0.8.4 组件与字号随屏缩放（theme.py 工厂）
+
+所有通用工厂内可调尺寸改为按 `scale` 缩放：
+
+| 组件 | 原 | 新 |
+|------|-----|-----|
+| `card` 默认内边距 | 26 | `round(26×scale)` |
+| `stat_card` 内边距 | 28 | `round(28×scale)` |
+| 指标卡数值字号 | 43 | `round(43×scale)` |
+| 指标卡说明字号 | 20 | `round(20×scale)+font_delta` |
+| `title_label` | 35 | 不随屏（页面标题恒定醒目） |
+| `subtitle_label` | 20.5 | `round(20.5×scale)` |
+| `hint_label`/`guide_item` | 19 / 24 | `round(x×scale)` |
+| 弹窗默认尺寸 | 硬编码 | 见 §0.8.5 |
+| `badge`/`chip` 内边距 | 3,12 / 6,14 | `round(x×scale)` |
+
+> **字号上限约束**：任一随屏字号 `max(尺寸, 屏幕≥2160 时上限)` 不设硬上限，仅靠 `scale` 截断在 `[0.82,1.25]` 内，保证大字不溢出、小屏可读。
+
+#### 0.8.5 弹窗尺寸自适应
+
+散落各处的 `QDialog.resize(W,H)` 统一改为按 `scale` 缩放（`round(W×scale), round(H×scale)`）：
+
+| 弹窗 | 位置 | 原尺寸 |
+|------|------|--------|
+| 课程详情 | `master.py _view_library_course` | 560×600 |
+| 任务检测 | `apprentice.py _open_quiz_dialog` | 460×340 |
+| 评论 | `social.py _show_comments` | 440×460 |
+| 重绑师傅 | `admin.py _open_rebind_dialog` | 360×160 |
+| 登录/注册 | `login.py` | 660×980（另见 §0.4，随屏缩放） |
+
+> 登录/注册对话框（660×980）在 `scale<1` 时同步缩放，避免小屏放不下。
+
+#### 0.8.6 各页面布局美化（本次一并落地）
+
+在屏幕自适应基础上，对以下页面做**布局与留白美化**：
+
+1. **师傅概览**（§1.1）：指标卡 `QGridLayout` 列间距 14→`round(16×scale)`；详情区固定高 `clamp(屏高×0.34, 300, 460)` 保留，但基准改为 `screen_metrics().height`；知识点条形图维度名 `setFixedWidth(220)` → `round(220×scale)`。
+2. **徒弟概览**（§2.1）：错题统计 `stat_card` 保持两列，卡片内边距随屏缩放。
+3. **进度排行**（§0.7）：进度条 `setFixedWidth(140)` → `round(140×scale)`；姓名/分数列 `min-width` 随屏缩放。
+4. **投喂资料**（§1.2）：三个 `QGroupBox` 上边距统一，按钮与消息行对齐；输入框随屏留白。
+5. **知识库**（§1.3）：维度卡内边距 14→`round(14×scale)`，标题 21→`round(21×scale)`。
+6. **交流圈**（§0.6）：帖子卡内边距 22→`round(22×scale)`，图片缩略 300×210 随 `scale` 等比放大。
+7. **表格**（徒弟管理/审核等）：`QTableWidget` 单元格内边距 `padding:14px`→`round(14×scale)`，行高随屏微调。
+
+> **实现边界**：全部改动限定在 `ui/` 包（theme.py / main_window.py / master.py / apprentice.py / admin.py / social.py / notify.py / progress.py / login.py），**不改后端**（main.py / db.py / auth.py / schemas.py）。新增 `screen_metrics()` 为唯一取屏入口，其余模块 `import` 复用；保留既有"工厂返回 QWidget、样式只作用于 QWidget"铁律。
+
 ---
 
 ## 一、师傅（Master）UI 设计
@@ -445,7 +532,9 @@
 │  …(每维度一段, 整体置于 QScrollArea, 最多渲染 60 个考点)     │
 └────────────────────────────────────────────────────────────┘
 ```
-数据：`dimensions[].points[]`；每个考点渲染为 `badge(name, Color.SUCCESS)`。
+数据：`dimensions[].points[]`；每个考点渲染为 `badge(point_name, Color.SUCCESS)`。
+
+> **考点名称字段容错约定（本次新增）**：后端 `points[]` 元素 dict 的考点名称字段**约定为 `title`**（与 `GET /api/master/knowledge` 实际返回一致，元素含 `id / dimension_id / title / content / source_ref / level`）。前端取值按 **`title` 优先 → `name` 兜底 → 退回 `str(point)` 但需截断到 30 字符防字典展开** 三级容错，**严禁直接把 dict 当字符串渲染**（否则会渲染出 `{'id': 2, 'dimension_id': 1, 'title': '风控校验', ...}` 这种原始 JSON，破坏 badge 视觉）。该约定与 §1.3 知识库维度卡考点行、§1.1 概览图 ① 条形图考点计数等所有读取 `points[].title/name` 的地方统一。
 
 **③ 徒弟数量** — 徒弟名册卡片墙（每行 3 个）
 
@@ -592,6 +681,8 @@ addStretch(1)                    ← 弹簧兜底，吸收所有剩余空间
 └──────────────────────────────────────┘
 ```
 接口：`GET /api/master/knowledge`(main内联)、`POST /api/master/refine`(P3)`{success,...}`。
+
+> **考点行字段容错（与 §1.1.2 ② 统一）**：知识库维度卡的考点行 `· {point_title}  [{level}]` 中，**`point_title` 同样遵循 `title` 优先 → `name` 兜底 → 截断到 30 字符**三级容错，避免后端字段微调导致整张维度卡变成 JSON 字典列表。
 
 ### 1.4 徒弟管理（_build_master_apprentices）
 

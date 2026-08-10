@@ -11,6 +11,7 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtCore import Qt
 
 from ui.api import ApiThread, BASE_URL
+from ui.theme import screen_metrics, _scaled
 
 _RED_WHITE_QSS = """
 QDialog { background: qlineargradient(x1:0,y1:0,x2:1,y2:1, stop:0 #ffffff, stop:1 #fdecec); }
@@ -54,7 +55,7 @@ class LoginDialog(QDialog):
         self.user = None
         self._threads = []
         self.setWindowTitle("薪火 · AI 导师系统 — 登录")
-        self.setFixedSize(660, 980)
+        self.setFixedSize(_scaled(660), _scaled(980))
         self.setStyleSheet(_RED_WHITE_QSS)
         self._init_ui()
         self._load_companies()
@@ -62,8 +63,8 @@ class LoginDialog(QDialog):
     # ---------- UI ----------
     def _init_ui(self):
         root = QVBoxLayout(self)
-        root.setContentsMargins(72, 54, 72, 46)
-        root.setSpacing(22)
+        root.setContentsMargins(_scaled(72), _scaled(54), _scaled(72), _scaled(46))
+        root.setSpacing(_scaled(22))
 
         title = QLabel("🔥  薪火 · AI 导师系统")
         title.setObjectName("loginTitle")

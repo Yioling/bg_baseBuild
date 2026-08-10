@@ -34,7 +34,10 @@ from PyQt5.QtWidgets import (
 )
 
 from ui.api import ApiMixin, BASE_URL
-from ui.theme import GLOBAL_QSS, SIDEBAR_QSS, Color, title_label, subtitle_label
+from ui.theme import (
+    GLOBAL_QSS, SIDEBAR_QSS, Color, title_label, subtitle_label,
+    screen_metrics, _scaled,
+)
 from ui.master import MasterPagesMixin
 from ui.apprentice import ApprenticePagesMixin
 from ui.admin import AdminPagesMixin
@@ -101,8 +104,11 @@ class MainWindow(
         self.token = token
         self.user = user
         self.setWindowTitle("薪火 · 师傅带徒 AI 导师系统")
-        self.resize(1520, 940)
-        self.setMinimumSize(1200, 780)
+        m = screen_metrics()
+        self.resize(min(round(m["width"] * 0.92), 1660),
+                    min(round(m["height"] * 0.90), 1000))
+        self.setMinimumSize(max(1120, round(m["width"] * 0.72)),
+                            round(m["height"] * 0.72))
         self.setStyleSheet(GLOBAL_QSS)
         self._init_ui()
         self._refresh_notify_badge()
@@ -137,7 +143,17 @@ class MainWindow(
     def _build_sidebar(self, page_ids) -> QWidget:
         sidebar = QWidget()
         sidebar.setObjectName("sidebar")
-        sidebar.setStyleSheet(SIDEBAR_QSS)
+        fd = screen_metrics()["font_delta"]
+        # 追加随屏字号覆盖（QSS 常量不能插值，此处叠加内联规则）
+        sidebar.setStyleSheet(SIDEBAR_QSS + (
+            f"QWidget#sidebar QPushButton{{font-size:{20 + fd}px;}}"
+            f"QLabel#logo{{font-size:{29 + fd}px;}}"
+            f"QLabel#logoSub{{font-size:{17 + fd}px;}}"
+            f"QLabel#userName{{font-size:{24 + fd}px;}}"
+            f"QLabel#userRole{{font-size:{19 + fd}px;}}"
+        ))
+        # 覆盖 SIDEBAR_QSS 的固定 378px，随屏幕缩放（约 246~375px）
+        sidebar.setFixedWidth(_scaled(300))
         lay = QVBoxLayout(sidebar)
         lay.setContentsMargins(0, 0, 0, 14)
         lay.setSpacing(0)
@@ -176,7 +192,7 @@ class MainWindow(
 
         avatar = QLabel("👤")
         avatar.setObjectName("userAvatar")
-        avatar.setFixedWidth(34)
+        avatar.setFixedWidth(_scaled(34))
         avatar.setAlignment(Qt.AlignLeft | Qt.AlignTop)
         info_lay.addWidget(avatar, 0, Qt.AlignTop)
 
@@ -211,8 +227,12 @@ class MainWindow(
         page = QWidget()
         page.setStyleSheet(f"background: {Color.BG};")
         v = QVBoxLayout(page)
-        v.setContentsMargins(52, 28, 52, 20)
-        v.setSpacing(8)
+        m = screen_metrics()
+        # 宽屏额外压缩左右留白，让卡片更饱满
+        wide_extra = _scaled(8) if m["wide"] else 0
+        hm = _scaled(48) + wide_extra
+        v.setContentsMargins(hm, _scaled(26), hm, _scaled(20))
+        v.setSpacing(_scaled(8))
 
         _, page_title, page_sub = PAGE_META[pid]
         v.addWidget(title_label(page_title))
@@ -229,8 +249,8 @@ class MainWindow(
         inner.setObjectName("pageInner")
         inner.setProperty("pageId", pid)
         il = QVBoxLayout(inner)
-        il.setContentsMargins(0, 14, 0, 0)
-        il.setSpacing(20)
+        il.setContentsMargins(0, _scaled(14), 0, 0)
+        il.setSpacing(_scaled(20))
         scroll.setWidget(inner)
 
         v.addWidget(scroll, 1)
