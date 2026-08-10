@@ -418,6 +418,95 @@
 
 > **实现边界**：全部改动限定在 `ui/` 包（theme.py / main_window.py / master.py / apprentice.py / admin.py / social.py / notify.py / progress.py / login.py），**不改后端**（main.py / db.py / auth.py / schemas.py）。新增 `screen_metrics()` 为唯一取屏入口，其余模块 `import` 复用；保留既有"工厂返回 QWidget、样式只作用于 QWidget"铁律。
 
+### 0.9 UI 美化增强（UI Polish，本次新增）
+
+> **总原则**：全部为**样式 / 动效 / 微交互**改动，**不动 API、不动数据流、不动布局结构**；遵守"样式只作用于 QWidget、不对 QLayout setStyleSheet"铁律；延续 §0.8 的 `_scaled()` 屏幕自适应。共 11 项，按"全局观感提升最大"优先。
+
+#### 0.9.1 侧边栏品牌感增强（sidebar）
+
+| 改动 | 说明 |
+|------|------|
+| Logo 衬底 | `logo` 上方包一层半透明白圆角块（`rgba(255,255,255,.08)`，圆角 `Radius.MD`），"🔥 薪火"更醒目 |
+| 底部信息分隔线 | `userinfo` 与导航区之间加 `QFrame.HLine`（`rgba(255,255,255,.12)`），隔离用户信息区 |
+
+#### 0.9.2 卡片 hover 微交互（theme.card）
+
+给**通用 `card()`** 增加统一悬停反馈（此前仅 `stat_card` 有）：
+
+| 状态 | 表现 |
+|------|------|
+| 默认 | 现有白卡 + 阴影 `blur 24 / dy 6` |
+| 悬停 | 边框 `#f3c6c6` + 阴影 `blur 30 / dy 10 / alpha 34` + 轻微上移视觉 |
+| 实现 | `card()` 内挂 `enterEvent/leaveEvent`（复用 `stat_card` 模式，样式仅作用于 QFrame） |
+
+> 影响面：知识库维度卡、徒弟卡、帖子卡、通知卡、课程卡、排行卡、日志卡等全部列表型卡片，点击暗示更清晰。
+
+#### 0.9.3 空态 / 加载态观感提升（theme）
+
+| 组件 | 改动 |
+|------|------|
+| `empty_label` | 居中字变大、加浅色圆角底卡（`#f6f1f1` + `Radius.LG` + 内边距），比裸灰字更有"区域感" |
+| `loading_label` | 用**不确定 `QProgressBar`**（`setRange(0,0)` 动画横条）替代转圈 emoji，观感更现代 |
+
+#### 0.9.4 表单 placeholder 灰化 + 焦点态（GLOBAL_QSS）
+
+| 项 | 改动 |
+|----|------|
+| placeholder | `QLineEdit/QTextEdit/QComboBox` 的 placeholder 统一 `#9ca3af`（浅灰，区别于输入色 `#1f1a1a`） |
+| 焦点态 | focus 时 `background:#fef9f9` 淡红底 + 2px 红边 + 轻投影（`QGraphicsDropShadowEffect` 由 GLOBAL_QSS 用 `border` 实现，不新增投影层） |
+
+> 说明：placeholder 灰化用 QSS `placeholder-text-color`；焦点态仅改 border/background 颜色，不改布局。
+
+#### 0.9.5 按钮语义色收紧（theme 工厂 + GLOBAL_QSS）
+
+纠正当前语义色混用（`success_button` 是红框红字、`danger_button` 是深红实底，主/次/幽灵层次不清）：
+
+| 按钮 | 现状 | 新样式 |
+|------|------|--------|
+| `primary_button` 主按钮 | 红底白字 | **保持**（红底白字，`Color.PRIMARY` 实底） |
+| `secondary_button` 次要 | 白底灰边 | **保持**（白底 `Color.BORDER` 边 + 灰字） |
+| `ghost_button` 幽灵 | 透明红字 | **保持**（透明底 + 红字） |
+| `success_button` 成功 | 红框红字 | **改为** 绿实底白字（`Color.SUCCESS`） |
+| `danger_button` 危险 | 深红实底 | **改为** 白底红字红边（与次要对齐，仅强调危险） |
+
+> 语义各归其位：成功=绿、危险=红、主=品牌红实底、次=灰、幽灵=透明。
+
+#### 0.9.6 页面头部品牌红 accent 线（main_window._create_page）
+
+副标题下方、画布上方加一条品牌红短线（`3px × 40px`，`Color.PRIMARY`）作页眉锚点，增强标题层次。
+
+#### 0.9.7 页面切换淡入动画（main_window）
+
+`_load_page` 完成构建后，对 `pageInner` 做 `QPropertyAnimation`（`opacity` 0→1，180ms）+ 轻微上移 8px，替代生硬的 QStackedWidget 直接切换。
+
+> 实现：`pageInner` 需允许 `setGraphicsEffect`（动画作用在 `QGraphicsOpacityEffect` 上），完成后移除 effect 避免叠加。
+
+#### 0.9.8 通知未读红点徽章（main_window + notify）
+
+侧边栏"🔔 通知"按钮右上角加**红色圆点徽章**（`QPushButton` 文本前缀红点），未读 >0 时显示、=0 时隐藏，替代/补充当前 `(N)` 文案；红点带轻微闪烁（`QPropertyAnimation` opacity 0.4↔1）。
+
+#### 0.9.9 进度条统一工厂（theme.progress_bar）
+
+新增 `progress_bar(value, color=Color.PRIMARY, height=None)` 工厂，统一 track/chunk 圆角与高度，替换三处散落的进度条：
+- 概览知识维度条形图（品牌红）
+- 学情看板 / 摸底 `_mastery_bar`（绿/橙/红）
+- 进度排行 `progress.py`（透明 track）
+
+#### 0.9.10 弹窗内容统一样式（theme + 各弹窗）
+
+各 `QDialog` 内容区套用统一底色 `Color.BG` + 内边距，标题行统一用 `section_label`，关闭/确认按钮统一 `secondary_button` / `primary_button`；消除系统默认白底突兀感。涉及：课程详情、任务检测、评论、重绑师傅、学习计划 PDF 等。
+
+#### 0.9.11 表格行 hover / 选中态（GLOBAL_QSS）
+
+| 项 | 改动 |
+|----|------|
+| 行 hover | `QTableWidget::item:hover` 淡红底 `#fdf2f2` |
+| 行选中 | `QTableWidget::item:selected` 品牌红软底 `#fef2f2` + 红字 |
+| 表头 | 加轻微下渐变 `#faf5f5→#f2e9e9` |
+| 单元格 | 垂直居中 `alignment`（QSS `item { padding }` 保持） |
+
+> 纯样式，不改表格数据结构与 API。
+
 ---
 
 ## 一、师傅（Master）UI 设计

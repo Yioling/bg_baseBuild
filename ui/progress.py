@@ -1,8 +1,8 @@
 """进度三视图：公司 / 部门 / 同门 排行（契约：/api/progress/*）。"""
-from PyQt5.QtWidgets import QVBoxLayout, QHBoxLayout, QLabel, QComboBox, QProgressBar
+from PyQt5.QtWidgets import QVBoxLayout, QHBoxLayout, QLabel, QComboBox
 
 from ui.api import BASE_URL
-from ui.theme import Color, card, loading_label, empty_label, _scaled
+from ui.theme import Color, card, loading_label, empty_label, _scaled, progress_bar
 
 
 class ProgressPagesMixin:
@@ -59,10 +59,7 @@ class ProgressPagesMixin:
             al.addStretch()
 
             pct = a.get("progress_pct", 0) or 0
-            bar = QProgressBar()
-            bar.setMaximum(100)
-            bar.setValue(int(pct))
-            bar.setTextVisible(False)
+            bar = progress_bar(value=int(pct), maximum=100, color=Color.PRIMARY, height=14)
             bar.setFixedWidth(_scaled(140))
             al.addWidget(bar)
             pl = QLabel(f"{pct}%")

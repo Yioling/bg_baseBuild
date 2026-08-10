@@ -328,7 +328,9 @@ class SocialPagesMixin:
         dlg = QDialog(self)
         dlg.setWindowTitle("评论")
         dlg.resize(_scaled(440), _scaled(460))
+        dlg.setStyleSheet(f"QDialog{{background:{Color.BG};}}")
         dl = QVBoxLayout(dlg)
+        dl.setContentsMargins(_scaled(20), _scaled(16), _scaled(20), _scaled(16))
         dl.setSpacing(10)
 
         scroll = QScrollArea()

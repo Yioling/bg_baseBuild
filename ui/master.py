@@ -36,7 +36,7 @@ from ui.theme import (
     Color, card, stat_card, section_label, hint_label, loading_label,
     empty_label, primary_button, success_button, secondary_button, badge, refine_button,
     apply_shadow, ingest_button, guide_item, GUIDE_BOX_TITLE_QSS,
-    screen_metrics, _scaled,
+    screen_metrics, _scaled, progress_bar,
 )
 
 
@@ -150,10 +150,7 @@ class MasterPagesMixin:
             name.setFixedWidth(_scaled(220))
             name.setWordWrap(True)
             rl.addWidget(name)
-            bar = QProgressBar()
-            bar.setMaximum(max_pt)
-            bar.setValue(n)
-            bar.setTextVisible(False)
+            bar = progress_bar(value=n, maximum=max_pt, color=Color.PRIMARY, height=20)
             bar.setFixedHeight(_scaled(20))
             rl.addWidget(bar, 1)
             cnt = QLabel(str(n))
@@ -523,7 +520,9 @@ class MasterPagesMixin:
         dlg = QDialog(self)
         dlg.setWindowTitle(course.get("title", "课程详情"))
         dlg.resize(_scaled(560), _scaled(600))
+        dlg.setStyleSheet(f"QDialog{{background:{Color.BG};}}")
         lay = QVBoxLayout(dlg)
+        lay.setContentsMargins(_scaled(20), _scaled(16), _scaled(20), _scaled(16))
         lay.setSpacing(12)
         head = QHBoxLayout()
         title = QLabel(f'📚 {course.get("title", "")}')
@@ -547,7 +546,7 @@ class MasterPagesMixin:
         il.addWidget(body)
         scroll.setWidget(inner)
         lay.addWidget(scroll, 1)
-        close_btn = primary_button("关闭")
+        close_btn = secondary_button("关闭")
         close_btn.clicked.connect(dlg.accept)
         lay.addWidget(close_btn, alignment=Qt.AlignRight)
         dlg.exec_()
@@ -834,14 +833,7 @@ def _mastery_bar(m: dict) -> QVBoxLayout:
     lbl = QLabel(f'{m.get("dim_name", "")} — {level}')
     lbl.setStyleSheet(f"color:{Color.TEXT};font-size:{_scaled(19)}px;font-weight:600;background:transparent;")
     box.addWidget(lbl)
-    bar = QProgressBar()
-    bar.setMaximum(100)
-    bar.setValue(pct)
-    bar.setTextVisible(False)
-    bar.setStyleSheet(
-        f"QProgressBar{{border:none;border-radius:5px;background:#e9edf3;height:{_scaled(10)}px;}}"
-        f"QProgressBar::chunk{{background:{color};border-radius:5px;}}")
-    box.addWidget(bar)
+    box.addWidget(progress_bar(value=pct, maximum=100, color=color, height=10))
     return box
 
 

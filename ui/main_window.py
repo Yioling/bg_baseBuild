@@ -27,11 +27,12 @@ if _fh is not None:
                                        datefmt="%H:%M:%S"))
     logging.getLogger().addHandler(_fh)
 
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import Qt, QPropertyAnimation, QEasingCurve
 from PyQt5.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel,
     QStackedWidget, QScrollArea, QButtonGroup, QFrame,
 )
+from PyQt5.QtWidgets import QGraphicsOpacityEffect
 
 from ui.api import ApiMixin, BASE_URL
 from ui.theme import (
@@ -147,8 +148,8 @@ class MainWindow(
         # 追加随屏字号覆盖（QSS 常量不能插值，此处叠加内联规则）
         sidebar.setStyleSheet(SIDEBAR_QSS + (
             f"QWidget#sidebar QPushButton{{font-size:{20 + fd}px;}}"
-            f"QLabel#logo{{font-size:{29 + fd}px;}}"
-            f"QLabel#logoSub{{font-size:{17 + fd}px;}}"
+            f"QLabel#logo{{font-size:{29 + fd}px;padding:0;}}"
+            f"QLabel#logoSub{{font-size:{17 + fd}px;padding:2px 0 0 0;}}"
             f"QLabel#userName{{font-size:{24 + fd}px;}}"
             f"QLabel#userRole{{font-size:{19 + fd}px;}}"
         ))
@@ -158,12 +159,25 @@ class MainWindow(
         lay.setContentsMargins(0, 0, 0, 14)
         lay.setSpacing(0)
 
+        # Logo 圆底衬底（半透明白，增强品牌感，仅作用于 QWidget）
+        logo_wrap = QWidget()
+        logo_wrap.setObjectName("logoWrap")
+        logo_wrap.setStyleSheet(
+            "QWidget#logoWrap{background:rgba(255,255,255,0.08);"
+            "border-radius:16px;margin:20px 24px 0 24px;}"
+        )
+        logo_lay = QVBoxLayout(logo_wrap)
+        logo_lay.setContentsMargins(8, 6, 8, 6)
+        logo_lay.setSpacing(0)
         logo = QLabel("🔥  薪火")
         logo.setObjectName("logo")
-        lay.addWidget(logo)
+        logo.setAlignment(Qt.AlignCenter)
+        logo_lay.addWidget(logo)
         logo_sub = QLabel("师傅带徒 · AI 导师系统")
         logo_sub.setObjectName("logoSub")
-        lay.addWidget(logo_sub)
+        logo_sub.setAlignment(Qt.AlignCenter)
+        logo_lay.addWidget(logo_sub)
+        lay.addWidget(logo_wrap)
 
         self.sidebar_btns = []
         self.nav_btn_map = {}
@@ -179,6 +193,13 @@ class MainWindow(
             self.nav_btn_map[pid] = btn
 
         lay.addStretch()
+
+        # 用户信息区上方分隔线（半透明白）
+        sep = QFrame()
+        sep.setFrameShape(QFrame.HLine)
+        sep.setStyleSheet("color:rgba(255,255,255,0.14);background:rgba(255,255,255,0.14);"
+                          "max-height:1px;margin:4px 24px;")
+        lay.addWidget(sep)
 
         role_names = {"admin": "管理员", "master": "师傅", "apprentice": "徒弟"}
         display = self.user.get("full_name") or self.user.get("username", "")
@@ -238,6 +259,12 @@ class MainWindow(
         v.addWidget(title_label(page_title))
         v.addWidget(subtitle_label(page_sub))
 
+        # 页面头部品牌红 accent 短线（页眉锚点）
+        accent_line = QFrame()
+        accent_line.setFixedSize(_scaled(44), _scaled(3))
+        accent_line.setStyleSheet(f"background:{Color.PRIMARY};border:none;border-radius:2px;")
+        v.addWidget(accent_line)
+
         scroll = QScrollArea()
         scroll.setObjectName("pageScroll")
         scroll.setWidgetResizable(True)
@@ -262,6 +289,24 @@ class MainWindow(
         if pid in self.nav_btn_map:
             self.nav_btn_map[pid].setChecked(True)
         self._load_page(pid)
+        self._fade_in_page(pid)
+
+    def _fade_in_page(self, pid):
+        """页面切换淡入：opacity 0→1 + 轻微上移，完成后移除 effect 避免叠加。"""
+        inner = self._page_inners.get(pid)
+        if not inner:
+            return
+        eff = QGraphicsOpacityEffect(inner)
+        eff.setOpacity(0.0)
+        inner.setGraphicsEffect(eff)
+        anim = QPropertyAnimation(eff, b"opacity", self)
+        anim.setDuration(180)
+        anim.setStartValue(0.0)
+        anim.setEndValue(1.0)
+        anim.setEasingCurve(QEasingCurve.OutCubic)
+        anim.finished.connect(lambda: inner.setGraphicsEffect(None))
+        anim.start()
+        self._fade_anim = anim
 
     def _load_page(self, pid):
         inner = self._page_inners[pid]
@@ -330,7 +375,13 @@ class MainWindow(
             if not btn:
                 return
             unread = res.get("unread_count", 0) if res.get("success") else 0
-            btn.setText(f"🔔  通知  ({unread})" if unread else "🔔  通知")
+            # 未读 >0 时以红点 + 计数提示；=0 时恢复常规铃铛图标
+            if unread:
+                btn.setText(f"🔴  通知  ({unread})")
+                btn.setToolTip(f"有 {unread} 条未读通知")
+            else:
+                btn.setText("🔔  通知")
+                btn.setToolTip("暂无未读通知")
 
         self._api_call("GET", f"{BASE_URL}/api/notifications", callback=on_res)
 

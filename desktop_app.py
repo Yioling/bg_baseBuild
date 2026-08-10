@@ -62,6 +62,8 @@ def launch_desktop(start_server_flag=True):
     palette = QPalette()
     palette.setColor(QPalette.Window, QColor(Color.BG))
     palette.setColor(QPalette.WindowText, QColor(Color.TEXT))
+    # 输入控件 placeholder 灰化（与输入色区分，提升表单可读性）
+    palette.setColor(QPalette.PlaceholderText, QColor("#9ca3af"))
     app.setPalette(palette)
 
     login = LoginDialog()
