@@ -4,8 +4,9 @@ from backend.llm import chat_json, chat, use_mock
 from backend.db import get_conn
 
 
-ASSESS_SYSTEM = """你是一位严格的技术测评官。按以下 JSON 格式出题：
+ASSESS_SYSTEM = """你是一位严格的技术测评官。根据提供的知识维度出题，题目从易到难分布，覆盖全面知识点。
 
+严格按 JSON 格式输出：
 {
   "questions": [
     {
@@ -21,10 +22,12 @@ ASSESS_SYSTEM = """你是一位严格的技术测评官。按以下 JSON 格式�
 }
 
 要求：
-1. 每个维度出 3 题（难度：易、中、难各 1 题）
-2. qtype 为 choice（选择）或 short（简答）；short 题 options 为 null
-3. 题目要考察真正的理解，不以记忆为主
-4. 确保所有文本为中文"""
+1. 题目难度从易到难分布：简单题约占30%，中等题约占40%，难题约占30%
+2. 题目覆盖所有提供的知识维度，不要只考一个维度
+3. qtype 为 choice（选择）或 short（简答）；short 题 options 为 null
+4. 选择题要有 4 个选项且答案明确；简答题要有明确的评分要点
+5. 题目考察真正的理解与应用，不以记忆为主
+6. 确保所有文本为中文"""
 
 GRADE_SYSTEM = """你是一位严谨的阅卷官。对徒弟的作答进行批改。
 
@@ -42,11 +45,17 @@ GRADE_SYSTEM = """你是一位严谨的阅卷官。对徒弟的作答进行批�
 - 无需展示过程，只输出 JSON"""
 
 
-def generate_assessment(apprentice_id: int, kb_id: int) -> dict:
-    """生成摸底考试题目。"""
+def generate_assessment(apprentice_id: int, kb_id: int, num_questions: int = 10) -> dict:
+    """生成摸底考试题目。
+
+    Args:
+        apprentice_id: 徒弟ID
+        kb_id: 知识库ID
+        num_questions: 题目数量（默认10题），由师傅决定
+    """
     conn = get_conn()
     dims = conn.execute(
-        "SELECT d.* FROM dimensions d WHERE d.kb_id=? ORDER BY d.sort_order LIMIT 8",
+        "SELECT d.* FROM dimensions d WHERE d.kb_id=? ORDER BY d.sort_order",
         (kb_id,),
     ).fetchall()
     if not dims:
@@ -65,7 +74,11 @@ def generate_assessment(apprentice_id: int, kb_id: int) -> dict:
         })
 
     dims_json = json.dumps(dims_list, ensure_ascii=False, indent=2)
-    result = chat_json(ASSESS_SYSTEM, f"请基于以下知识维度出摸底考试题：\n\n{dims_json}")
+    # 根据师傅要求的题量生成题目，强调难度分布和知识点覆盖
+    result = chat_json(ASSESS_SYSTEM,
+        f"请基于以下知识维度出 {num_questions} 道摸底考试题。\n"
+        f"要求：简单题约{int(num_questions*0.3)}道、中等题约{int(num_questions*0.4)}道、难题约{int(num_questions*0.3)}道。\n"
+        f"题目要从易到难，所有知识维度都要覆盖，不要集中在同一个知识点。\n\n{dims_json}")
 
     if not result or "questions" not in result:
         return {"success": False, "message": "题目生成失败"}
@@ -264,6 +277,309 @@ def grade_quiz_answer(plan_item_id: int, answer: str, context: str = None) -> di
     except (TypeError, ValueError):
         score = min(100, max(20, len(answer or "") * 3)) if answer else 20
         return {"score": score, "feedback": "（分数解析失败，已兜底评分）"}
+
+
+WEAKNESS_ANALYSIS_SYSTEM = """你是一位资深技术导师，擅长分析学员的薄弱点并给出针对性提升建议。
+
+输入：学员的答题情况（包含题目、作答、分数、反馈）
+输出：JSON格式的薄弱点分析和提升建议
+
+严格按以下JSON格式输出：
+{
+  "weakness_summary": "总体薄弱点概述（30字以内）",
+  "weak_points": [
+    {
+      "dimension": "薄弱维度名称",
+      "problem_type": "问题类型：如概念不清、记忆模糊、计算错误、理解偏差等",
+      "specific_issue": "具体问题描述",
+      "recommendation": "针对性提升建议（具体可执行）"
+    }
+  ],
+  "strength_points": ["掌握良好的维度列表"],
+  "next_study_priority": ["下一步学习优先级排序（从高到低）"],
+  "estimated_improvement": "预计多久可以改善（如：坚持练习2周可明显提升）"
+}
+
+要求：
+1. 分析要具体，不仅指出"不会"，要说明"哪里不会"和"如何改进"
+2. 提升建议要具体可执行，如：需要重新学习哪个知识点、需要做什么练习
+3. 优先指出高频错误和关键概念理解偏差
+4. 确保所有文本为中文"""
+
+def analyze_weaknesses(assessment_id: int) -> dict:
+    """针对作答情况分析薄弱点。
+
+    Args:
+        assessment_id: 评估记录ID
+
+    Returns:
+        包含薄弱点分析、Strength points、提升建议等
+    """
+    conn = get_conn()
+
+    # 获取评估信息和所有答题
+    ass = conn.execute("SELECT * FROM assessments WHERE id=?", (assessment_id,)).fetchone()
+    if not ass:
+        return {"success": False, "message": "评估不存在"}
+
+    questions = conn.execute(
+        "SELECT * FROM assessment_questions WHERE assessment_id=? ORDER BY id",
+        (assessment_id,),
+    ).fetchall()
+
+    # 收集答题详情
+    answer_details = []
+    for q in questions:
+        ans = conn.execute(
+            "SELECT * FROM assessment_answers WHERE question_id=? AND assessment_id=?",
+            (q["id"], assessment_id),
+        ).fetchone()
+
+        # 获取维度名称
+        dim_row = conn.execute("SELECT name FROM dimensions WHERE id=?", (q["dimension_id"],)).fetchone()
+        dim_name = dim_row["name"] if dim_row else "未知维度"
+
+        answer_details.append({
+            "dimension": dim_name,
+            "question": q["question"],
+            "qtype": q["qtype"],
+            "difficulty": q["difficulty"],
+            "answer_key": q["answer_key"],
+            "apprentice_answer": ans["apprentice_answer"] if ans else "未作答",
+            "score": ans["score"] if ans else 0,
+            "feedback": ans["feedback"] if ans else "",
+        })
+
+    if not answer_details:
+        return {"success": False, "message": "暂无答题记录"}
+
+    # 构建分析prompt
+    prompt = "请分析以下答题情况，找出薄弱点并给出提升建议：\n\n"
+    for i, a in enumerate(answer_details, 1):
+        prompt += f"第{i}题：[{a['difficulty']}] {a['dimension']}\n"
+        prompt += f"题目：{a['question']}\n"
+        prompt += f"学员作答：{a['apprentice_answer']}\n"
+        prompt += f"得分：{a['score']} | 反馈：{a['feedback']}\n\n"
+
+    # 演示模式兜底
+    if use_mock():
+        return {
+            "success": True,
+            "weakness_summary": "需要在并发编程和异常处理方面加强练习",
+            "weak_points": [
+                {
+                    "dimension": "并发编程",
+                    "problem_type": "概念理解不深",
+                    "specific_issue": "对线程同步机制理解模糊，不能正确选择锁类型",
+                    "recommendation": "1. 重新学习线程安全概念；2. 练习使用RLock和Condition；3. 完成并发编程实战练习"
+                },
+                {
+                    "dimension": "异常处理",
+                    "problem_type": "处理不当",
+                    "specific_issue": "异常捕获后未做适当处理，直接pass",
+                    "recommendation": "1. 学习异常处理最佳实践；2. 记录异常日志；3. 根据异常类型做不同处理"
+                }
+            ],
+            "strength_points": ["基础语法", "面向对象概念"],
+            "next_study_priority": ["并发编程实战", "异常处理进阶", "设计模式"],
+            "estimated_improvement": "针对薄弱点集中练习2-3周可明显提升"
+        }
+
+    result = chat_json(WEAKNESS_ANALYSIS_SYSTEM, prompt)
+
+    if not result or not isinstance(result, dict):
+        return {
+            "success": True,
+            "weakness_summary": "建议针对错题进行针对性复习",
+            "weak_points": [],
+            "strength_points": [],
+            "next_study_priority": [],
+            "estimated_improvement": "坚持每日练习可逐步改善"
+        }
+
+    return {
+        "success": True,
+        "weakness_summary": result.get("weakness_summary", ""),
+        "weak_points": result.get("weak_points", []),
+        "strength_points": result.get("strength_points", []),
+        "next_study_priority": result.get("next_study_priority", []),
+        "estimated_improvement": result.get("estimated_improvement", ""),
+    }
+
+
+TRAINING_RECOMMENDATION_SYSTEM = """你是一位资深的培养计划专家，根据学员的薄弱点分析生成具体可执行的培养建议。
+
+输入：学员的薄弱点分析、各维度掌握情况
+输出：JSON格式的具体培养建议
+
+严格按以下JSON格式输出：
+{
+  "training_overview": "培养总体思路（50字以内）",
+  "recommendations": [
+    {
+      "priority": 1,
+      "dimension": "维度名称",
+      "target_issue": "针对的具体问题",
+      "learning_content": "需要学习的内容（具体）",
+      "practical_tasks": ["需要完成的实践任务列表"],
+      "resources": ["推荐学习资源"],
+      "duration_estimate": "预计需要多长时间（如：3-5天）",
+      "success_criteria": "完成标准（如何判断掌握）"
+    }
+  ],
+  "daily_schedule_suggestion": "每日学习时间建议（如：每天30-60分钟）",
+  "encouragement": "鼓励语（30字以内）"
+}
+
+要求：
+1. 每条建议都要具体可执行，不能是空话
+2. practical_tasks 要列出具体的任务内容，如：阅读某章节、完成某个练习项目
+3. resources 可以是具体的文档链接或书籍章节
+4. success_criteria 要有明确的判断标准
+5. 按优先级排序，优先解决关键薄弱点
+6. 确保所有文本为中文"""
+
+def generate_training_recommendation(apprentice_id: int, assessment_id: int = None) -> dict:
+    """根据掌握情况生成下一步培养计划建议。
+
+    Args:
+        apprentice_id: 徒弟ID
+        assessment_id: 可选，评估ID（如果提供将结合答题情况进行更精准的分析）
+
+    Returns:
+        包含具体可执行的培养建议
+    """
+    conn = get_conn()
+
+    # 获取徒弟信息
+    apprentice = conn.execute("SELECT * FROM users WHERE id=?", (apprentice_id,)).fetchone()
+    if not apprentice:
+        return {"success": False, "message": "徒弟不存在"}
+
+    # 获取掌握等级
+    mastery_rows = conn.execute(
+        "SELECT m.*, d.name as dim_name FROM mastery m JOIN dimensions d ON m.dimension_id = d.id WHERE m.apprentice_id=?",
+        (apprentice_id,),
+    ).fetchall()
+
+    # 获取知识维度详情
+    dims = conn.execute(
+        "SELECT d.*, kb.name as kb_name FROM dimensions d JOIN knowledge_bases kb ON d.kb_id = kb.id WHERE kb.master_id=?",
+        (apprentice.get("master_id"),),
+    ).fetchall()
+
+    dim_info = {}
+    for d in dims:
+        dim_info[d["id"]] = {
+            "name": d["name"],
+            "description": d["description"] or "",
+            "mastery": "未掌握"
+        }
+
+    # 更新掌握等级
+    for m in mastery_rows:
+        if m["dimension_id"] in dim_info:
+            dim_info[m["dimension_id"]]["mastery"] = m["level"]
+
+    mastery_summary = []
+    weak_dims = []
+    for dim_id, info in dim_info.items():
+        mastery_summary.append(f"{info['name']}：{info['mastery']}")
+        if info["mastery"] in ["未掌握", "了解"]:
+            weak_dims.append(info["name"])
+
+    # 如果提供了assessment_id，获取答题详情
+    answer_context = ""
+    if assessment_id:
+        ans_detail = analyze_weaknesses(assessment_id)
+        if ans_detail.get("success"):
+            answer_context = f"\n\n答题分析结果：\n"
+            answer_context += f"薄弱点概述：{ans_detail.get('weakness_summary', '')}\n"
+            answer_context += f"薄弱维度：{', '.join(weak_dims)}\n"
+            if ans_detail.get("weak_points"):
+                answer_context += "\n具体问题：\n"
+                for wp in ans_detail["weak_points"][:3]:
+                    answer_context += f"- {wp.get('dimension')}: {wp.get('specific_issue', '')}\n"
+                    answer_context += f"  建议：{wp.get('recommendation', '')}\n"
+
+    # 演示模式兜底
+    if use_mock():
+        return {
+            "success": True,
+            "training_overview": "针对薄弱点制定个性化培养计划，重点突破并发编程和异常处理",
+            "recommendations": [
+                {
+                    "priority": 1,
+                    "dimension": "并发编程",
+                    "target_issue": "线程同步机制理解模糊，不能正确选择锁类型",
+                    "learning_content": "1. 学习线程安全基础概念；2. 深入理解RLock/Condition/Semaphore；3. 了解死锁产生条件及避免方法",
+                    "practical_tasks": [
+                        "完成线程安全练习：使用锁保护共享资源",
+                        "实现一个简单的生产者-消费者模型",
+                        "编写一个避免死锁的银行转账程序"
+                    ],
+                    "resources": ["Python并发编程官方文档", "《Python高性能编程》第三章"],
+                    "duration_estimate": "5-7天",
+                    "success_criteria": "能正确使用Lock/RLock完成线程同步，独立实现生产者-消费者模式"
+                },
+                {
+                    "priority": 2,
+                    "dimension": "异常处理",
+                    "target_issue": "异常捕获后未做适当处理，直接pass",
+                    "learning_content": "1. 学习异常处理最佳实践；2. 理解常见异常类型及处理方式；3. 异常日志记录方法",
+                    "practical_tasks": [
+                        "重构现有代码中的异常处理逻辑",
+                        "为关键函数添加异常捕获和日志记录",
+                        "实现自定义异常类"
+                    ],
+                    "resources": ["Python异常处理官方文档", "《Python技巧》异常处理章节"],
+                    "duration_estimate": "3-5天",
+                    "success_criteria": "能编写规范的异常处理代码，能根据异常类型做不同响应"
+                },
+                {
+                    "priority": 3,
+                    "dimension": "设计模式",
+                    "target_issue": "缺乏设计模式知识，难以写出可维护代码",
+                    "learning_content": "1. 理解单例模式、工厂模式、策略模式；2. 学习如何在实际项目中应用",
+                    "practical_tasks": [
+                        "为现有项目应用单例模式优化配置管理",
+                        "使用策略模式重构条件判断代码"
+                    ],
+                    "resources": ["《设计模式》GoF23", "Python设计模式实战"],
+                    "duration_estimate": "7-10天",
+                    "success_criteria": "能识别场景并正确应用至少3种设计模式"
+                }
+            ],
+            "daily_schedule_suggestion": "每天学习30-45分钟，分散在早中晚三个时段",
+            "encouragement": "坚持每日练习，薄弱点一定会转化为优势！"
+        }
+
+    # 构建prompt
+    prompt = f"请为徒弟生成个性化的培养建议。\n\n徒弟信息：{apprentice.get('full_name', apprentice.get('username'))}\n"
+    prompt += f"当前掌握情况：\n" + "\n".join(mastery_summary) + "\n"
+    prompt += f"需要加强的维度：{', '.join(weak_dims) if weak_dims else '暂无明显薄弱点'}\n"
+    prompt += answer_context
+    prompt += "\n\n请生成分层次、有针对性的培养建议，每条建议都要具体可执行。"
+
+    result = chat_json(TRAINING_RECOMMENDATION_SYSTEM, prompt)
+
+    if not result or not isinstance(result, dict):
+        return {
+            "success": False,
+            "message": "培养建议生成失败，请稍后重试",
+            "training_overview": "",
+            "recommendations": [],
+            "daily_schedule_suggestion": "",
+            "encouragement": ""
+        }
+
+    return {
+        "success": True,
+        "training_overview": result.get("training_overview", ""),
+        "recommendations": result.get("recommendations", []),
+        "daily_schedule_suggestion": result.get("daily_schedule_suggestion", ""),
+        "encouragement": result.get("encouragement", ""),
+    }
 
 
 def get_mistakes(apprentice_id: int) -> dict:
