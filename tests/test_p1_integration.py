@@ -294,8 +294,11 @@ def test_assessor_local_fallback(client, conn):
         (kb_id,))
     conn.commit()
 
-    # 调 generate_assessment（实环境连不上 DeepSeek 时会触发本地降级）
-    r = generate_assessment(master_id, kb_id)
+    # 调 generate_assessment：mock chat_json 返空以触发本地降级出题
+    # （测试环境 MOCK_MODE=true 时 chat_json 会返回内置示例，此处强制模拟 LLM 失败）
+    from unittest.mock import patch
+    with patch("backend.agents.assessor.chat_json", lambda *a, **k: {}):
+        r = generate_assessment(master_id, kb_id)
     assert r.get("success") is True, f"应能出题，实得: {r}"
     assert len(r["questions"]) >= 3, f"应至少 3 题，实得 {len(r['questions'])}"
     for q in r["questions"]:

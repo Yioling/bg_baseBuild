@@ -141,9 +141,16 @@ def test_notify_anomaly_to_admins_when_no_master(conn):
     a2 = make_user(conn, "admin2", "admin", company_id=1)
     make_user(conn, "m1", "master", company_id=1)  # 不应收到
     r = notify_anomaly("小明", "异常", conn=conn, company_id=1)
-    assert r["success"] and r["count"] == 2
+    assert r["success"]
+    # 应至少通知本测试新建的 2 个 admin（种子 admin 也符合 approved admin 条件，
+    # 不排除 count > 2，只断言自建 admin 确实收到、master 未收到）
+    assert r["count"] >= 2
     rows = conn.execute("SELECT user_id FROM notifications").fetchall()
-    assert {row["user_id"] for row in rows} == {a1, a2}
+    notified = {row["user_id"] for row in rows}
+    assert {a1, a2}.issubset(notified)
+    # master 不应收到
+    m1_id = conn.execute("SELECT id FROM users WHERE username='m1'").fetchone()[0]
+    assert m1_id not in notified
 
 
 def test_notify_via_webhook_placeholder_no_raise():

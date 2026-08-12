@@ -81,7 +81,10 @@ def generate_assessment(apprentice_id: int, kb_id: int, num_questions: int = 10)
         f"题目要从易到难，所有知识维度都要覆盖，不要集中在同一个知识点。\n\n{dims_json}")
 
     if not result or "questions" not in result:
-        return {"success": False, "message": "题目生成失败"}
+        # LLM 不可用 / 返回畸形 → 本地降级出题，保证徒弟始终能进入考试
+        result = _local_generate_questions(dims_list, num_questions)
+        if not result or "questions" not in result:
+            return {"success": False, "message": "题目生成失败"}
 
     # 创建评估记录
     cur = conn.execute(
@@ -258,7 +261,12 @@ def grade_quiz_answer(plan_item_id: int, answer: str, context: str = None) -> di
 
     # 演示模式兜底
     if use_mock():
-        score = min(100, max(20, len(answer or "") * 3)) if answer else 20
+        if not answer or not answer.strip():
+            return {
+                "score": 0,
+                "feedback": "（演示模式）未检测到作答内容，得0分；请补充完整作答后再提交。",
+            }
+        score = min(100, max(20, len(answer) * 3))
         return {
             "score": score,
             "feedback": "（演示模式）已根据作答长度给出初评；配置真实 LLM 后将以语义理解评分。",
@@ -270,12 +278,16 @@ def grade_quiz_answer(plan_item_id: int, answer: str, context: str = None) -> di
 
     # 解析结果
     if not isinstance(result, dict) or "score" not in result:
-        score = min(100, max(20, len(answer or "") * 3)) if answer else 20
+        if not answer or not answer.strip():
+            return {"score": 0, "feedback": "（LLM 解析失败）未检测到作答内容，得0分。"}
+        score = min(100, max(20, len(answer) * 3))
         return {"score": score, "feedback": "（LLM 解析失败，已兜底评分）"}
     try:
         return {"score": int(result.get("score", 0)), "feedback": str(result.get("feedback", ""))}
     except (TypeError, ValueError):
-        score = min(100, max(20, len(answer or "") * 3)) if answer else 20
+        if not answer or not answer.strip():
+            return {"score": 0, "feedback": "（分数解析失败）未检测到作答内容，得0分。"}
+        score = min(100, max(20, len(answer) * 3))
         return {"score": score, "feedback": "（分数解析失败，已兜底评分）"}
 
 
@@ -465,7 +477,7 @@ def generate_training_recommendation(apprentice_id: int, assessment_id: int = No
     # 获取知识维度详情
     dims = conn.execute(
         "SELECT d.*, kb.name as kb_name FROM dimensions d JOIN knowledge_bases kb ON d.kb_id = kb.id WHERE kb.master_id=?",
-        (apprentice.get("master_id"),),
+        (apprentice["master_id"],),
     ).fetchall()
 
     dim_info = {}
@@ -555,7 +567,7 @@ def generate_training_recommendation(apprentice_id: int, assessment_id: int = No
         }
 
     # 构建prompt
-    prompt = f"请为徒弟生成个性化的培养建议。\n\n徒弟信息：{apprentice.get('full_name', apprentice.get('username'))}\n"
+    prompt = f"请为徒弟生成个性化的培养建议。\n\n徒弟信息：{apprentice.get('full_name') or apprentice.get('username')}\n"
     prompt += f"当前掌握情况：\n" + "\n".join(mastery_summary) + "\n"
     prompt += f"需要加强的维度：{', '.join(weak_dims) if weak_dims else '暂无明显薄弱点'}\n"
     prompt += answer_context
@@ -612,3 +624,105 @@ def get_mistakes(apprentice_id: int) -> dict:
         "assess_mistakes": [dict(m) for m in assess_mistakes],
         "review_mistakes": [dict(m) for m in review_mistakes],
     }
+
+
+# ==================== 本地降级：LLM 不可用时的兜底出题/批改 ====================
+
+def _local_generate_questions(dims_list: list, num_questions: int = 10) -> dict:
+    """LLM 不可用时的本地兜底出题。
+
+    根据知识维度生成简答题（short），每题包含 dimension_name/question/qtype/
+    difficulty/answer_key，保证 generate_assessment 在无 LLM 时也能出题。
+
+    策略：每个维度轮询出题直到达到 num_questions；题目内容基于维度名/描述/
+    知识点标题拼接，answer_key 取该维度首个知识点的 content 作为评分要点。
+    """
+    if not dims_list:
+        return {"questions": []}
+
+    difficulties = ["易", "中", "难"]
+    questions = []
+    n = max(1, int(num_questions))
+    # 轮询维度，保证覆盖
+    idx = 0
+    while len(questions) < n:
+        dim = dims_list[idx % len(dims_list)]
+        dim_name = dim.get("name", "未知维度")
+        dim_desc = dim.get("description", "")
+        points = dim.get("points", []) or []
+        point = points[len(questions) % len(points)] if points else None
+
+        if point:
+            title = point.get("title", dim_name)
+            key = point.get("content", title)
+            question = f"请简述 {dim_name} 中「{title}」的核心要点。"
+            answer_key = key
+        else:
+            question = f"请说明 {dim_name} 的主要概念。{dim_desc}".strip()
+            answer_key = dim_desc or dim_name
+
+        questions.append({
+            "dimension_name": dim_name,
+            "question": question,
+            "qtype": "short",
+            "difficulty": difficulties[len(questions) % len(difficulties)],
+            "options": None,
+            "answer_key": answer_key,
+        })
+        idx += 1
+        # 安全阀：防止 num_questions 异常大导致死循环
+        if idx > n * len(dims_list) + 100:
+            break
+
+    return {"questions": questions}
+
+
+def _local_grade(answer: str, q_data: dict) -> dict:
+    """LLM 不可用时的本地兜底批改。
+
+    选择题：精确匹配 answer_key（忽略大小写/空白），对 100 错 0。
+    简答题：按 answer_key 的关键字符（>=2 字）在作答中的命中比例打分，
+            全命中 ≥ 60，部分命中按比例，空作答 0 分。
+
+    返回 {"score": int, "is_correct": bool, "feedback": str}。
+    """
+    if not isinstance(q_data, dict):
+        return {"score": 0, "is_correct": False, "feedback": "题目数据无效"}
+
+    qtype = q_data.get("qtype", "short")
+    key = (q_data.get("answer_key") or "").strip()
+
+    # 选择题：精确匹配
+    if qtype == "choice":
+        ans = (answer or "").strip()
+        is_correct = bool(key) and ans.upper() == key.upper()
+        score = 100 if is_correct else 0
+        feedback = "回答正确。" if is_correct else f"回答错误，正确答案：{key}"
+        return {"score": score, "is_correct": is_correct, "feedback": feedback}
+
+    # 简答题：关键点命中比例
+    if not answer or not str(answer).strip():
+        return {"score": 0, "is_correct": False, "feedback": "未作答。"}
+
+    if not key:
+        # 无标准答案，按作答非空给一个鼓励性分数
+        return {"score": 60, "is_correct": True,
+                "feedback": "无标准答案，按作答完整性给分。"}
+
+    # 提取关键词（按常见分隔符切分；中文场景下退化为整段）
+    import re
+    raw_keys = re.split(r"[、,，;；\s]+", key)
+    # 过滤掉过短的词（<2 字），避免单字噪音
+    keys = [k for k in raw_keys if len(k) >= 2]
+    if not keys:
+        keys = [key]
+
+    ans_text = str(answer)
+    hit = sum(1 for k in keys if k in ans_text)
+    ratio = hit / len(keys) if keys else 0
+    # 全命中 90，按比例线性映射到 [0, 90]，保证全命中 ≥ 60
+    score = int(round(ratio * 90))
+    is_correct = score >= 60
+    feedback = (f"关键词命中 {hit}/{len(keys)}。"
+                f"参考要点：{key}")
+    return {"score": score, "is_correct": is_correct, "feedback": feedback}

@@ -20,11 +20,11 @@ def test_grade_quiz_answer_no_key_fallback(conn):
 
 
 def test_grade_quiz_answer_empty_answer(conn):
-    """空作答走兜底，不抛异常。"""
+    """空作答走兜底，返回0分且不抛异常。"""
     res = grade_quiz_answer(1, "", context="课程内容")
     assert isinstance(res, dict)
     assert "score" in res
-    assert res["score"] == 20  # 空答案默认 20
+    assert res["score"] == 0  # 空答案默认 0
 
 
 def test_grade_quiz_answer_normal(conn):
@@ -117,7 +117,7 @@ def test_extract_json_invalid():
 # ---------- 现有 agent 签名回归测试 ----------
 
 def test_assessor_exports(conn):
-    """assessor 现有函数签名未被破坏（含新增的 analyze_weaknesses 和 generate_training_recommendation）。"""
+    """assessor 现有函数签名未被破坏。"""
     from backend.agents import assessor
     assert callable(assessor.generate_assessment)
     assert callable(assessor.grade_answer)
@@ -158,12 +158,11 @@ def test_analyze_weaknesses_mock_mode(conn):
     """演示模式下返回完整的兜底分析结构。"""
     from unittest.mock import patch
     with patch("backend.agents.assessor.use_mock", lambda: True):
-        # 先创建一个评估记录和题目
         conn.execute(
             "INSERT INTO assessments (apprentice_id, kb_id, status) VALUES (?, ?, ?)",
             (1, 1, "in_progress")
         )
-        ass_id = conn.lastrowid
+        ass_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
         conn.execute(
             "INSERT INTO assessment_questions (assessment_id, dimension_id, question, qtype, difficulty, answer_key) VALUES (?, ?, ?, ?, ?, ?)",
             (ass_id, 1, "测试题", "choice", "易", "A")
@@ -185,7 +184,7 @@ def test_analyze_weaknesses_returns_all_fields(conn):
             "INSERT INTO assessments (apprentice_id, kb_id, status) VALUES (?, ?, ?)",
             (1, 1, "in_progress")
         )
-        ass_id = conn.lastrowid
+        ass_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
         conn.execute(
             "INSERT INTO assessment_questions (assessment_id, dimension_id, question, qtype, difficulty, answer_key) VALUES (?, ?, ?, ?, ?, ?)",
             (ass_id, 1, "测试题", "short", "中", "关键点")
@@ -217,7 +216,6 @@ def test_generate_training_recommendation_mock_mode(conn):
         assert "recommendations" in res
         assert isinstance(res["recommendations"], list)
         assert len(res["recommendations"]) > 0
-        # 验证recommendation结构完整
         rec = res["recommendations"][0]
         assert "priority" in rec
         assert "dimension" in rec
@@ -232,12 +230,11 @@ def test_generate_training_recommendation_with_assessment(conn):
     """带有assessment_id时能正常处理。"""
     from unittest.mock import patch
     with patch("backend.agents.assessor.use_mock", lambda: True):
-        # 创建评估
         conn.execute(
             "INSERT INTO assessments (apprentice_id, kb_id, status) VALUES (?, ?, ?)",
             (1, 1, "in_progress")
         )
-        ass_id = conn.lastrowid
+        ass_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
         conn.commit()
 
         res = generate_training_recommendation(apprentice_id=1, assessment_id=ass_id)
